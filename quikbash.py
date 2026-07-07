@@ -45,7 +45,7 @@ def init_new_repo():
         if result.returncode != 0:
             messagebox.showerror("Git Error", f"Failed at: {' '.join(cmd)}\n{result.stderr}")
             return
-    messagebox.showinfo("Success", "Repository initialized and pushed successfully!")
+    messagebox.showinfo("Success", "Repository initialization complete!")
 
 
 def commit_changes():
@@ -67,7 +67,7 @@ def commit_changes():
     result = subprocess.run(['git', '-C', folder, 'commit', '-m', msg], capture_output=True, text=True)
 
     if result.returncode == 0:
-        messagebox.showinfo("Success", "Changes committed!")
+        messagebox.showinfo("Success", "Commits are ready to be pushed.")
     else:
         messagebox.showerror("Git Error", result.stderr)
 
@@ -91,7 +91,7 @@ def push_to_github():
 # --- GUI Setup ---
 
 root = tk.Tk()
-root.title("QuikBash Alpha 1.0")
+root.title("QuikBash Alpha 1.1")
 root.geometry("400x450")
 
 tk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(10, 0))
@@ -109,13 +109,13 @@ tab_control.pack(expand=True, fill="both", padx=10, pady=10)
 tk.Label(tab1, text="GitHub URL:").pack(pady=(10, 0))
 url_entry = tk.Entry(tab1, width=40)
 url_entry.pack(pady=5)
-tk.Button(tab1, text="Initialize & Push", command=init_new_repo, bg="#e1e1e1").pack(pady=20)
+tk.Button(tab1, text="Initialize & Push", command=init_new_repo).pack(pady=20)
 
 # Tab 2
 tk.Label(tab2, text="Commit Message:").pack(pady=(10, 0))
 commit_entry = tk.Entry(tab2, width=40)
 commit_entry.pack(pady=5)
-tk.Button(tab2, text="Add & Commit", command=commit_changes).pack(pady=5)
+tk.Button(tab2, text="Add & Commit", command=commit_changes).pack(pady=(20, 5))
 tk.Button(tab2, text="Push to GitHub", command=push_to_github).pack(pady=5)
 
 root.mainloop()

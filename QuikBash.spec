@@ -35,5 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:\\Users\\kristoffer\\Desktop\\Personalize\\Favicons\\Essential\\quikbash.ico'],
+    icon=['C:\\Users\\kristoffer\\Desktop\\Personalize\\Favicons\\Essential\\qb_fav.ico'],
 )
