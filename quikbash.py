@@ -11,8 +11,6 @@ import os
 import subprocess
 
 
-# --- Logic Functions ---
-
 def validate_environment(folder_name, check_git=True):
     if not os.path.isdir(folder_name):
         messagebox.showerror("Error", f"Path '{folder_name}' is not a valid directory.")
