@@ -10,141 +10,114 @@ import os
 # allow py to run ext commands (git)
 import subprocess
 
+
+# --- Logic Functions ---
+
 def validate_environment(folder_name, check_git=True):
     if not os.path.isdir(folder_name):
-        messagebox.showerror("Error", f"The path '{folder_name}' is not a valid directory.")
+        messagebox.showerror("Error", f"Path '{folder_name}' is not a valid directory.")
         return False
-
     if check_git:
         result = subprocess.run(['git', '-C', folder_name, 'rev-parse', '--is-inside-work-tree'],
                                 capture_output=True, text=True)
         if result.returncode != 0:
-            messagebox.showerror("Error", "This folder is not a Git repository. Please initialize it first.")
+            messagebox.showerror("Error", "Not a Git repository. Initialize it first.")
             return False
     return True
 
-def run_git_init():
-    folder_name = folder_entry.get()
-    if not folder_name:
-        messagebox.showwarning("Input Error", "Please enter a folder name!")
+
+def init_new_repo():
+    folder = folder_entry.get()
+    url = url_entry.get()
+    if not folder or not url:
+        messagebox.showwarning("Input", "Please enter both folder path and GitHub URL!")
         return
 
-    if not os.path.exists(folder_name):
-        os.makedirs(folder_name)  # makedirs is safer than mkdir
+    commands = [
+        ['git', '-C', folder, 'init'],
+        ['git', '-C', folder, 'add', '.'],
+        ['git', '-C', folder, 'commit', '-m', 'Initial commit'],
+        ['git', '-C', folder, 'branch', '-M', 'main'],
+        ['git', '-C', folder, 'remote', 'add', 'origin', url],
+        ['git', '-C', folder, 'push', '-u', 'origin', 'main']
+    ]
 
-    result = subprocess.run(['git', '-C', folder_name, 'init'], capture_output=True, text=True)
-    if result.returncode == 0:
-        messagebox.showinfo("Success", "Git initialized successfully.")
-    else:
-        messagebox.showerror("Error", result.stderr)
+    for cmd in commands:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            messagebox.showerror("Git Error", f"Failed at: {' '.join(cmd)}\n{result.stderr}")
+            return
+    messagebox.showinfo("Success", "Repository initialized and pushed successfully!")
 
-def add_remote():
-    folder_name = folder_entry.get()
-    repo_url = remote_entry.get()
-
-    if not validate_environment(folder_name, check_git=True): return
-    if not repo_url:
-        messagebox.showwarning("Input", "Please enter a GitHub URL.")
-        return
-
-    # Check if remote already exists
-    check = subprocess.run(['git', '-C', folder_name, 'remote', 'get-url', 'origin'], capture_output=True)
-    if check.returncode == 0:
-        messagebox.showwarning("Info", "Remote 'origin' already exists.")
-        return
-
-    result = subprocess.run(['git', '-C', folder_name, 'remote', 'add', 'origin', repo_url], capture_output=True,
-                            text=True)
-    if result.returncode == 0:
-        messagebox.showinfo("Success", "Remote added!")
-    else:
-        messagebox.showerror("Error", result.stderr)
 
 def commit_changes():
-    folder_name = folder_entry.get()
+    folder = folder_entry.get()
+    msg = commit_entry.get()
 
-    # Check which tab is active and get the correct commit message
-    current_tab = tab_control.index(tab_control.select())
-
-    if current_tab == 0:  # Tab 1
-        commit_msg = commit_entry.get()
-    else:  # Tab 2
-        commit_msg = commit_entry_tab2.get()
-
-    if not commit_msg:
+    if not msg:
         messagebox.showwarning("Input", "Please enter a commit message!")
         return
 
-    status_check = subprocess.run(['git', '-C', folder_name, 'status', '--porcelain'],
-                                  capture_output=True, text=True)
+    if not validate_environment(folder): return
 
-    if not status_check.stdout.strip():
-        messagebox.showinfo("Status", "No changes detected. Working tree is clean!")
+    status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
+    if not status.stdout.strip():
+        messagebox.showinfo("Status", "No changes detected.")
         return
 
-    subprocess.run(['git', '-C', folder_name, 'add', '.'])
-    result = subprocess.run(['git', '-C', folder_name, 'commit', '-m', commit_msg], capture_output=True, text=True)
+    subprocess.run(['git', '-C', folder, 'add', '.'])
+    result = subprocess.run(['git', '-C', folder, 'commit', '-m', msg], capture_output=True, text=True)
 
     if result.returncode == 0:
         messagebox.showinfo("Success", "Changes committed!")
     else:
         messagebox.showerror("Git Error", result.stderr)
 
+
 def push_to_github():
-    folder_name = folder_entry.get()
-    if not validate_environment(folder_name, check_git=True): return
+    folder = folder_entry.get()
+    if not validate_environment(folder): return
 
-    # Check for uncommitted changes
-    status_check = subprocess.run(['git', '-C', folder_name, 'status', '--porcelain'],
-                                  capture_output=True, text=True)
+    status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
+    if status.stdout.strip():
+        messagebox.showerror("Push Blocked", "Uncommitted changes detected! Please commit them first.")
+        return
 
-    # If the output is NOT empty, we have files that aren't committed yet
-    if status_check.stdout.strip():
-        messagebox.showerror("Push Blocked", "You have uncommitted changes! Please commit them first.")
-        return  # This STOPs the function here, so the push command never runs
-
-    # If we get past that 'if', then it is safe to push
-    subprocess.run(['git', '-C', folder_name, 'branch', '-M', 'main'])
-    result = subprocess.run(['git', '-C', folder_name, 'push', '-u', 'origin', 'main'],
-                            capture_output=True, text=True)
-
+    result = subprocess.run(['git', '-C', folder, 'push', '-u', 'origin', 'main'], capture_output=True, text=True)
     if result.returncode == 0:
         messagebox.showinfo("Success", "Pushed to GitHub!")
     else:
         messagebox.showerror("Push Failed", result.stderr)
 
+
+# --- GUI Setup ---
+
 root = tk.Tk()
 root.title("QuikBash Alpha 1.0")
-root.geometry("400x500")
+root.geometry("400x450")
 
-tk.Label(root, text="Enter Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(10, 0))
+tk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(10, 0))
 folder_entry = tk.Entry(root, width=50)
 folder_entry.pack(pady=5)
 
 tab_control = ttk.Notebook(root)
-tab1 = ttk.Frame(tab_control);
+tab1 = ttk.Frame(tab_control)
 tab2 = ttk.Frame(tab_control)
-tab_control.add(tab1, text="New Repository");
-tab_control.add(tab2, text="Update Repository")
-tab_control.pack(expand=1, fill="both", padx=10, pady=10)
+tab_control.add(tab1, text="New Repo")
+tab_control.add(tab2, text="Update Repo")
+tab_control.pack(expand=True, fill="both", padx=10, pady=10)
 
-# Tab 1 Layout
-tk.Button(tab1, text="1. Initialize Git", command=run_git_init).pack(pady=5)
-tk.Label(tab1, text="GitHub URL:", font=('Arial', 9)).pack(pady=(30, 0))
-remote_entry = tk.Entry(tab1, width=40);
-remote_entry.pack(pady=5)
-tk.Button(tab1, text="2. Add Remote", command=add_remote).pack(pady=5)
-tk.Label(tab1, text="Commit Message:", font=('Arial', 9)).pack(pady=(30, 0))
-commit_entry = tk.Entry(tab1, width=40);
+# Tab 1
+tk.Label(tab1, text="GitHub URL:").pack(pady=(10, 0))
+url_entry = tk.Entry(tab1, width=40)
+url_entry.pack(pady=5)
+tk.Button(tab1, text="Initialize & Push", command=init_new_repo, bg="#e1e1e1").pack(pady=20)
+
+# Tab 2
+tk.Label(tab2, text="Commit Message:").pack(pady=(10, 0))
+commit_entry = tk.Entry(tab2, width=40)
 commit_entry.pack(pady=5)
-tk.Button(tab1, text="3. Add & Commit", command=commit_changes).pack(pady=5)
-tk.Button(tab1, text="4. Push to GitHub", command=push_to_github).pack(pady=15)
-
-# Tab 2 Layout
-tk.Label(tab2, text="Commit Message:", font=('Arial', 9)).pack(pady=(10, 0))
-commit_entry_tab2 = tk.Entry(tab2, width=40);
-commit_entry_tab2.pack(pady=5)
-tk.Button(tab2, text="1. Add & Commit", command=commit_changes).pack(pady=5)
-tk.Button(tab2, text="2. Push to GitHub", command=push_to_github).pack(pady=15)
+tk.Button(tab2, text="Add & Commit", command=commit_changes).pack(pady=5)
+tk.Button(tab2, text="Push to GitHub", command=push_to_github).pack(pady=5)
 
 root.mainloop()
