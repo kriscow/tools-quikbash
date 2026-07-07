@@ -1,6 +1,13 @@
+# GUI library
 import tkinter as tk
+
+# submodules: messagebox => pop-up windows, ttk => themed tk (modern look/widgets)
 from tkinter import messagebox, ttk
+
+# allow py to talk to file sys
 import os
+
+# allow py to run ext commands (git)
 import subprocess
 
 def validate_environment(folder_name, check_git=True):
@@ -9,7 +16,6 @@ def validate_environment(folder_name, check_git=True):
         return False
 
     if check_git:
-        # '-C' tells git to run in that folder
         result = subprocess.run(['git', '-C', folder_name, 'rev-parse', '--is-inside-work-tree'],
                                 capture_output=True, text=True)
         if result.returncode != 0:
@@ -108,7 +114,7 @@ def push_to_github():
         messagebox.showerror("Push Failed", result.stderr)
 
 root = tk.Tk()
-root.title("Git Quick-Clicker Pro")
+root.title("QuikBash Alpha 1.0")
 root.geometry("400x500")
 
 tk.Label(root, text="Enter Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(10, 0))
@@ -124,18 +130,21 @@ tab_control.pack(expand=1, fill="both", padx=10, pady=10)
 
 # Tab 1 Layout
 tk.Button(tab1, text="1. Initialize Git", command=run_git_init).pack(pady=5)
+tk.Label(tab1, text="GitHub URL:", font=('Arial', 9)).pack(pady=(30, 0))
 remote_entry = tk.Entry(tab1, width=40);
 remote_entry.pack(pady=5)
 tk.Button(tab1, text="2. Add Remote", command=add_remote).pack(pady=5)
+tk.Label(tab1, text="Commit Message:", font=('Arial', 9)).pack(pady=(30, 0))
 commit_entry = tk.Entry(tab1, width=40);
 commit_entry.pack(pady=5)
 tk.Button(tab1, text="3. Add & Commit", command=commit_changes).pack(pady=5)
-tk.Button(tab1, text="4. Push to GitHub", command=push_to_github).pack(pady=5)
+tk.Button(tab1, text="4. Push to GitHub", command=push_to_github).pack(pady=15)
 
 # Tab 2 Layout
+tk.Label(tab2, text="Commit Message:", font=('Arial', 9)).pack(pady=(10, 0))
 commit_entry_tab2 = tk.Entry(tab2, width=40);
 commit_entry_tab2.pack(pady=5)
-tk.Button(tab2, text="1. Add & Commit", command=commit_changes).pack(pady=10)
-tk.Button(tab2, text="2. Push to GitHub", command=push_to_github).pack(pady=10)
+tk.Button(tab2, text="1. Add & Commit", command=commit_changes).pack(pady=5)
+tk.Button(tab2, text="2. Push to GitHub", command=push_to_github).pack(pady=15)
 
 root.mainloop()
