@@ -230,7 +230,7 @@ anc_button = tk.Button(tab2, text="Add & Commit", command=commit_changes, state=
 anc_button.pack(pady=(20, 5))
 push_button = tk.Button(tab2, text="Push to GitHub", command=push_to_github, state="disabled")
 push_button.pack(pady=5)
-sync_button = tk.Button(tab2, text="Do All", command=do_all, state="disabled")
+sync_button = tk.Button(tab2, text="Do All", command=lambda: run_async(do_all), state="disabled")
 sync_button.pack(pady=5)
 
 root.mainloop()
