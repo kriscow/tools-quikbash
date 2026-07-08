@@ -58,6 +58,7 @@ def validate_environment(folder_name, check_git=True):
 def init_new_repo():
     folder = folder_entry.get()
     url = url_entry.get()
+
     if not folder or not url:
         messagebox.showwarning("Input", "Please enter both folder path and GitHub URL!")
         return
@@ -84,7 +85,7 @@ def do_all():
     folder = folder_entry.get()
     msg = commit_entry.get()
 
-    root.after(0, lambda: sync_button.config(text="Processing...", state="disabled"))
+    update_ui(sync_button.config, text="Processing...", state="disabled")
 
     try:
         if not folder or not msg:
@@ -93,7 +94,7 @@ def do_all():
 
         status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
         if not status.stdout.strip():
-            root.after(0, lambda: messagebox.showinfo("Status", "No changes detected."))
+            update_ui(messagebox.showinfo, title="Status", message="No changes detected.")
             return
 
         commands = [
@@ -105,14 +106,14 @@ def do_all():
         for cmd in commands:
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
-                root.after(0, lambda: messagebox.showerror("Git Error", f"Failed at: {' '.join(cmd)}\n{result.stderr}"))
+                update_ui(messagebox.showerror, title="Git Error", message="Failed!")
                 return
 
         save_history(folder)
-        root.after(0, lambda: messagebox.showinfo("Success", "Repository update complete!"))
+        update_ui(messagebox.showinfo, title="Success", message="Repository update complete!")
 
     finally:
-        root.after(0, lambda: sync_button.config(text="Do All", state="normal"))
+        update_ui(sync_button.config, text="Do All", state="normal")
 
 
 def commit_changes():
@@ -186,6 +187,8 @@ def save_history(path):
 def run_async(func):
     threading.Thread(target=func, daemon=True).start()
 
+def update_ui(func, **kwargs):
+    root.after(0, lambda: func(**kwargs))
 
 # ======================================================================================================================
 # INTERFACE
