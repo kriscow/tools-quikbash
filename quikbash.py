@@ -11,6 +11,26 @@ import os
 import subprocess
 
 
+# ======================================================================================================================
+# FUNCTIONS
+# ======================================================================================================================
+
+def validate_fields(*args):
+    if folder_var.get().strip() and url_var.get().strip():
+        init_button.config(state="normal")
+    else:
+        init_button.config(state="disabled")
+
+    if folder_var.get().strip() and msg_var.get().strip():
+        anc_button.config(state="normal")
+        push_button.config(state="normal")
+        sync_button.config(state="normal")
+    else:
+        anc_button.config(state="disabled")
+        push_button.config(state="disabled")
+        sync_button.config(state="disabled")
+
+
 def validate_environment(folder_name, check_git=True):
     if not os.path.isdir(folder_name):
         messagebox.showerror("Error", f"Path '{folder_name}' is not a valid directory.")
@@ -114,14 +134,24 @@ def push_to_github():
         messagebox.showerror("Push Failed", result.stderr)
 
 
-# --- GUI Setup ---
+# ======================================================================================================================
+# INTERFACE
+# ======================================================================================================================
 
 root = tk.Tk()
 root.title("QuikBash Alpha 1.2")
 root.geometry("400x450")
 
+folder_var = tk.StringVar()
+url_var = tk.StringVar()
+msg_var = tk.StringVar()
+
+folder_var.trace_add("write", validate_fields)
+url_var.trace_add("write", validate_fields)
+msg_var.trace_add("write", validate_fields)
+
 tk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(10, 0))
-folder_entry = tk.Entry(root, width=50)
+folder_entry = tk.Entry(root, width=50, textvariable=folder_var)
 folder_entry.pack(pady=5)
 
 tab_control = ttk.Notebook(root)
@@ -133,16 +163,20 @@ tab_control.pack(expand=True, fill="both", padx=10, pady=10)
 
 # Tab 1
 tk.Label(tab1, text="GitHub URL:").pack(pady=(10, 0))
-url_entry = tk.Entry(tab1, width=40)
+url_entry = tk.Entry(tab1, width=40, textvariable=url_var)
 url_entry.pack(pady=5)
-tk.Button(tab1, text="Initialize & Push", command=init_new_repo).pack(pady=20)
+init_button = tk.Button(tab1, text="Initialize & Push", command=init_new_repo, state="disabled")
+init_button.pack(pady=20)
 
 # Tab 2
 tk.Label(tab2, text="Commit Message:").pack(pady=(10, 0))
-commit_entry = tk.Entry(tab2, width=40)
+commit_entry = tk.Entry(tab2, width=40, textvariable=msg_var)
 commit_entry.pack(pady=5)
-tk.Button(tab2, text="Add & Commit", command=commit_changes).pack(pady=(20, 5))
-tk.Button(tab2, text="Push to GitHub", command=push_to_github).pack(pady=5)
-tk.Button(tab2, text="Do All", command=do_all).pack(pady=5)
+anc_button = tk.Button(tab2, text="Add & Commit", command=commit_changes, state="disabled")
+anc_button.pack(pady=(20, 5))
+push_button = tk.Button(tab2, text="Push to GitHub", command=push_to_github, state="disabled")
+push_button.pack(pady=5)
+sync_button = tk.Button(tab2, text="Do All", command=do_all, state="disabled")
+sync_button.pack(pady=5)
 
 root.mainloop()
