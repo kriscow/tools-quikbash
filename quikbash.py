@@ -10,7 +10,11 @@ import os
 # allow py to run ext commands (git)
 import subprocess
 
+# prevent tool from freezing during a process
+import threading
 
+
+# Variables
 h_file = "qb_history.txt"
 
 
@@ -79,6 +83,9 @@ def init_new_repo():
 def do_all():
     folder = folder_entry.get()
     msg = commit_entry.get()
+
+    root.after(0, lambda: sync_button.config(text="Processing...", state="disabled"))
+
     if not folder or not msg:
         messagebox.showwarning("Input", "Please enter both folder path and commit message!")
         return
@@ -97,10 +104,13 @@ def do_all():
     for cmd in commands:
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            messagebox.showerror("Git Error", f"Failed at: {' '.join(cmd)}\n{result.stderr}")
+            root.after(0, lambda: messagebox.showerror("Git Error", f"Failed at: {' '.join(cmd)}\n{result.stderr}"))
+            root.after(0, lambda: sync_button.config(text="Do All", state="normal"))
             return
+        
     save_history(folder)
-    messagebox.showinfo("Success", "Repository update complete!")
+    root.after(0, lambda: messagebox.showinfo("Success", "Repository update complete!"))
+    root.after(0, lambda: sync_button.config(text="Do All", state="normal"))
 
 
 def commit_changes():
@@ -166,6 +176,15 @@ def save_history(path):
         f.write('\n'.join(history))
     folder_entry['values'] = history
 
+
+# ======================================================================================================================
+# FUNCTIONS - THREADING
+# ======================================================================================================================
+
+def run_async(func):
+    threading.Thread(target=func, daemon=True).start()
+
+
 # ======================================================================================================================
 # INTERFACE
 # ======================================================================================================================
@@ -198,7 +217,7 @@ tab_control.pack(expand=True, fill="both", padx=10, pady=10)
 tk.Label(tab1, text="GitHub URL:").pack(pady=(10, 0))
 url_entry = tk.Entry(tab1, width=40, textvariable=url_var)
 url_entry.pack(pady=5)
-init_button = tk.Button(tab1, text="Initialize & Push", command=init_new_repo, state="disabled")
+init_button = tk.Button(tab1, text="Initialize & Push", command=lambda: run_async(init_new_repo), state="disabled")
 init_button.pack(pady=20)
 
 # TAB 2
