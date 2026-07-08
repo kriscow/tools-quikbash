@@ -1,19 +1,9 @@
-# GUI library
-import tkinter as tk
+import tkinter as tk                # GUI
+from tkinter import messagebox, ttk # GUI submodules
+import os                           # py <> file system communication
+import subprocess                   # py <> CLI communication
+import threading                    # freeze prevention
 
-# submodules: messagebox => pop-up windows, ttk => themed tk (modern look/widgets)
-from tkinter import messagebox, ttk
-
-# allow py to talk to file sys
-import os
-
-# allow py to run ext commands (git)
-import subprocess
-
-# prevent tool from freezing during a process
-import threading
-
-# Variables
 h_file = "qb_history.txt"
 
 # ======================================================================================================================
@@ -21,6 +11,9 @@ h_file = "qb_history.txt"
 # ======================================================================================================================
 
 def validate_fields(*args):
+
+    """Disable buttons if at least one required entry is empty."""
+
     if folder_var.get().strip() and url_var.get().strip():
         init_button.config(state="normal")
     else:
@@ -36,6 +29,9 @@ def validate_fields(*args):
         sync_button.config(state="disabled")
 
 def validate_environment(folder_name, check_git=True):
+
+    """Verifies the existence of the target path (though optional) and confirms if it is Git-ready."""
+
     if not os.path.isdir(folder_name):
         messagebox.showerror("Error", f"Path '{folder_name}' is not a valid directory.")
         return False
@@ -48,10 +44,13 @@ def validate_environment(folder_name, check_git=True):
     return True
 
 # ======================================================================================================================
-# COMMANDS
+# COMMANDS (Buttons)
 # ======================================================================================================================
 
 def init_new_repo():
+
+    """Merge all Git initialization commands into one button."""
+
     folder = folder_entry.get().strip()
     url = url_entry.get().strip()
 
@@ -87,6 +86,9 @@ def init_new_repo():
         update_sts(init_button.config, text="Initialize & Push")
 
 def do_all():
+
+    """Merge all Git repository update commands into one button."""
+
     folder = folder_entry.get().strip()
     branch = branch_var.get().strip()
     msg = commit_entry.get().strip()
@@ -141,6 +143,9 @@ def do_all():
         update_sts(sync_button.config, text="Do All")
 
 def commit_changes():
+
+    """Merge 'Add all' and 'Commit' into one button."""
+
     folder = folder_entry.get().strip()
     msg = commit_entry.get().strip()
 
@@ -173,6 +178,9 @@ def commit_changes():
         update_sts(anc_button.config, text="Add & Commit")
 
 def push_to_github():
+
+    """Finally push commitments to the connected GitHub repository."""
+
     folder = folder_entry.get().strip()
     branch = branch_var.get().strip()
 
@@ -215,16 +223,22 @@ def push_to_github():
         update_sts(push_button.config, text="Push to GitHub")
 
 # ======================================================================================================================
-# HISTORY
+# HISTORY (Of connected file paths)
 # ======================================================================================================================
 
 def load_history():
+
+    """Load the (5) most recently initialized/updated repositories."""
+
     if os.path.exists(h_file):
         with open(h_file, 'r') as f:
             return [line.strip() for line in f.readlines() if line.strip()]
     return []
 
 def save_history(path):
+
+    """If path is new, save it."""
+
     history = load_history()
 
     if path in history:
@@ -240,23 +254,25 @@ def save_history(path):
 # HELPERS
 # ======================================================================================================================
 
-# threading
+# Threading
 def run_async(func):
     threading.Thread(target=func, daemon=True).start()
 
-# process status
+# Process State (messagebox & button text)
 def update_sts(func, **kwargs):
     root.after(0, lambda: func(**kwargs))
 
-# button status
+# Button State (en/disabled)
 def update_btns(state):
     buttons = [init_button, anc_button, push_button, sync_button]
     for btn in buttons:
         update_sts(btn.config, state=state)
 
+# Status Text
 def set_status(text):
     update_sts(status_var.set, value=text)
 
+# Branch Entry Placeholder
 def add_placeholder(entry, placeholder):
     branch_var.set(placeholder)
 
@@ -264,60 +280,61 @@ def add_placeholder(entry, placeholder):
 # INTERFACE
 # ======================================================================================================================
 
+# Base
 root = tk.Tk()
 root.title("QuikBash Beta 1.1")
 root.geometry("500x450")
 
-# style
+# Theme
 style = ttk.Style()
 style.theme_use('clam')
 
-# palette
+# Palette
 orange = "#FF7F11"
 dark = "#262626"
 white = "#FFFFFF"
 lime = "#ACBFA4"
 
-# root
+# Base Style
 root.configure(background=white)
 style.configure(".", background=white, foreground=dark, fieldbackground=white)
 
-# buttons
+# Buttons
 style.configure("TButton", background=dark, foreground=white, borderwidth=0, padding=6)
 style.map("TButton", background=[("active", orange), ("disabled", "#D0D0D0")], foreground=[("active", white), ("disabled", "#888888")])
 
-# tabs
+# Tabs
 style.configure("TNotebook", background=white, borderwidth=0)
 style.configure("TNotebook.Tab", background="#F0F0F0", foreground=dark, padding=[20, 8]) # Increased horizontal padding
 style.map("TNotebook.Tab", background=[("selected", orange)], foreground=[("selected", white)], padding=[("selected", [20, 8])]) # Crucial: Force same padding when selected
 
-# entry, combobox
+# Entries, Comboboxes
 style.configure("TEntry", fieldbackground=white, bordercolor=dark, lightcolor=dark)
 style.configure("TCombobox", fieldbackground=white, bordercolor=dark)
 style.map("TEntry", fieldbackground=[("focus", white)], selectbackground=[("!disabled", dark)], selectforeground=[("!disabled", white)])
 style.map("TCombobox", fieldbackground=[("focus", white)], selectbackground=[("!disabled", dark)], selectforeground=[("!disabled", white)])
 
-# status
+# Status Text
 style.configure("Status.TLabel", background=lime, foreground=dark, padding=10)
 
-# entry variables
+# Entry Vars
 folder_var = tk.StringVar()
 url_var = tk.StringVar()
 branch_var = tk.StringVar()
 msg_var = tk.StringVar()
 
-# for validation
+# Smart Enabling (see validate_fields)
 folder_var.trace_add("write", validate_fields)
 url_var.trace_add("write", validate_fields)
 msg_var.trace_add("write", validate_fields)
 
-# header
+# Folder Path UI
 ttk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(20, 0))
 folder_entry = ttk.Combobox(root, width=50, textvariable=folder_var)
 folder_entry.pack(pady=(5, 30), padx=20, fill=tk.X)
 folder_entry['values'] = load_history()
 
-# tab control
+# Tab Control
 tab_control = ttk.Notebook(root)
 tab1 = ttk.Frame(tab_control, padding=10)
 tab2 = ttk.Frame(tab_control, padding=10)
@@ -325,7 +342,7 @@ tab_control.add(tab1, text="New Repo")
 tab_control.add(tab2, text="Update Repo")
 tab_control.pack(expand=True, fill="both", padx=10)
 
-# TAB 1
+# Tab 1 (New Repo)
 ttk.Label(tab1, text="GitHub URL:").pack(pady=(10, 0))
 url_entry = ttk.Entry(tab1, textvariable=url_var)
 url_entry.pack(pady=5, fill=tk.X)
@@ -333,7 +350,7 @@ url_entry.pack(pady=5, fill=tk.X)
 init_button = ttk.Button(tab1, text="Initialize & Push", command=lambda: run_async(init_new_repo), state="disabled")
 init_button.pack(fill=tk.X, pady=5)
 
-# TAB 2
+# Tab 2 (Update Repo)
 ttk.Label(tab2, text="Branch:").pack(pady=(10, 0))
 branch_entry = ttk.Entry(tab2, textvariable=branch_var)
 branch_entry.pack(pady=5, fill=tk.X)
@@ -355,7 +372,7 @@ push_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(5, 0))
 sync_button = ttk.Button(tab2, text="Do All", command=lambda: run_async(do_all), state="disabled")
 sync_button.pack(fill=tk.X, pady=5)
 
-# STATUS
+# Status Text
 status_frame = ttk.Frame(root)
 status_frame.pack(side=tk.BOTTOM, fill=tk.X)
 status_var = tk.StringVar(value="READY")
