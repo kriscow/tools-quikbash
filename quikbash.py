@@ -235,7 +235,7 @@ def update_btns(state):
 # ======================================================================================================================
 
 root = tk.Tk()
-root.title("QuikBash Alpha 1.4")
+root.title("QuikBash Alpha 1.6")
 root.geometry("400x450")
 
 folder_var = tk.StringVar()
