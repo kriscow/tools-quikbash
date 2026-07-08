@@ -99,7 +99,7 @@ def do_all():
             update_sts(messagebox.showwarning, title="Input", message="Please fill up all entry fields.")
             return
 
-        if not branch:
+        if not branch or branch == "main":
             branch = "main"
 
         checkout_res = subprocess.run(['git', '-C', folder, 'checkout', branch], capture_output=True, text=True)
@@ -181,7 +181,7 @@ def push_to_github():
     try:
         if not validate_environment(folder): return
 
-        if not branch:
+        if not branch or branch == "main":
             branch = "main"
 
         checkout_res = subprocess.run(['git', '-C', folder, 'checkout', branch], capture_output=True, text=True)
@@ -255,6 +255,9 @@ def update_btns(state):
 def set_status(text):
     update_sts(status_var.set, value=text)
 
+def add_placeholder(entry, placeholder):
+    branch_var.set(placeholder)
+
 # ======================================================================================================================
 # INTERFACE
 # ======================================================================================================================
@@ -299,6 +302,7 @@ init_button.pack(pady=20)
 tk.Label(tab2, text="Branch:").pack(pady=(10, 0))
 branch_entry = tk.Entry(tab2, width=40, textvariable=branch_var)
 branch_entry.pack(pady=5)
+add_placeholder(branch_entry, "main")
 
 # message entry
 tk.Label(tab2, text="Commit Message:").pack(pady=(10, 0))
