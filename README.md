@@ -4,11 +4,15 @@ Git workflows should not require opening a heavy, resource-intensive desktop app
 QuikBash is built to be fast and lightweight, focusing solely on the core commands.
 It is perfect for users who just want to get their code pushed without the wait.
 
+---
+
 ## 🟡 Features
 *   **One-Click Git Operations:** Initialize repositories, add files, commit, and push with ease.
 *   **Smart Workflow:** Built-in checks to ensure your environment is Git-ready and your branches are correct.
 *   **Responsive UI:** Multi-threaded architecture prevents the interface from freezing during Git processes.
 *   **Path Tracking:** Easily manage and revisit your recently used project paths.
+
+---
 
 ## 🟢 Installation
 ### For Developers
