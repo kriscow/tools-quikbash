@@ -19,7 +19,7 @@ h_file = "qb_history.txt"
 
 
 # ======================================================================================================================
-# FUNCTIONS - VALIDATION
+# VALIDATION
 # ======================================================================================================================
 
 def validate_fields(*args):
@@ -52,7 +52,7 @@ def validate_environment(folder_name, check_git=True):
 
 
 # ======================================================================================================================
-# FUNCTIONS - COMMANDS
+# COMMANDS
 # ======================================================================================================================
 
 def init_new_repo():
@@ -86,31 +86,33 @@ def do_all():
 
     root.after(0, lambda: sync_button.config(text="Processing...", state="disabled"))
 
-    if not folder or not msg:
-        messagebox.showwarning("Input", "Please enter both folder path and commit message!")
-        return
-
-    commands = [
-        ['git', '-C', folder, 'add', '.'],
-        ['git', '-C', folder, 'commit', '-m', msg],
-        ['git', '-C', folder, 'push', '-u', 'origin', 'main']
-    ]
-
-    status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
-    if not status.stdout.strip():
-        messagebox.showinfo("Status", "No changes detected.")
-        return
-
-    for cmd in commands:
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            root.after(0, lambda: messagebox.showerror("Git Error", f"Failed at: {' '.join(cmd)}\n{result.stderr}"))
-            root.after(0, lambda: sync_button.config(text="Do All", state="normal"))
+    try:
+        if not folder or not msg:
+            messagebox.showwarning("Input", "Please enter both folder path and commit message!")
             return
-        
-    save_history(folder)
-    root.after(0, lambda: messagebox.showinfo("Success", "Repository update complete!"))
-    root.after(0, lambda: sync_button.config(text="Do All", state="normal"))
+
+        status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
+        if not status.stdout.strip():
+            root.after(0, lambda: messagebox.showinfo("Status", "No changes detected."))
+            return
+
+        commands = [
+            ['git', '-C', folder, 'add', '.'],
+            ['git', '-C', folder, 'commit', '-m', msg],
+            ['git', '-C', folder, 'push', '-u', 'origin', 'main']
+        ]
+
+        for cmd in commands:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                root.after(0, lambda: messagebox.showerror("Git Error", f"Failed at: {' '.join(cmd)}\n{result.stderr}"))
+                return
+
+        save_history(folder)
+        root.after(0, lambda: messagebox.showinfo("Success", "Repository update complete!"))
+
+    finally:
+        root.after(0, lambda: sync_button.config(text="Do All", state="normal"))
 
 
 def commit_changes():
@@ -155,7 +157,7 @@ def push_to_github():
 
 
 # ======================================================================================================================
-# FUNCTIONS - HISTORY
+# HISTORY
 # ======================================================================================================================
 
 def load_history():
@@ -178,7 +180,7 @@ def save_history(path):
 
 
 # ======================================================================================================================
-# FUNCTIONS - THREADING
+# THREADING
 # ======================================================================================================================
 
 def run_async(func):
