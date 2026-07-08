@@ -276,6 +276,7 @@ style.theme_use('clam')
 orange = "#FF7F11"
 dark = "#262626"
 white = "#FFFFFF"
+lime = "#ACBFA4"
 
 # 1. Root & Base
 root.configure(background=white)
@@ -317,7 +318,7 @@ style.map("TCombobox",
           selectforeground=[("!disabled", white)])
 
 # 5. Status Bar
-style.configure("Status.TLabel", background=dark, foreground=white, padding=10)
+style.configure("Status.TLabel", background=lime, foreground=dark, padding=10)
 
 # Configure basic styling for padding/margin
 folder_var = tk.StringVar()
