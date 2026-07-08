@@ -59,38 +59,48 @@ def init_new_repo():
     folder = folder_entry.get()
     url = url_entry.get()
 
-    if not folder or not url:
-        messagebox.showwarning("Input", "Please enter both folder path and GitHub URL!")
-        return
+    update_btns("disabled")
+    update_sts(sync_button.config, text="Processing...")
 
-    commands = [
-        ['git', '-C', folder, 'init'],
-        ['git', '-C', folder, 'add', '.'],
-        ['git', '-C', folder, 'commit', '-m', 'Initial commit'],
-        ['git', '-C', folder, 'branch', '-M', 'main'],
-        ['git', '-C', folder, 'remote', 'add', 'origin', url],
-        ['git', '-C', folder, 'push', '-u', 'origin', 'main']
-    ]
-
-    for cmd in commands:
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            messagebox.showerror("Git Error", f"Failed at: {' '.join(cmd)}\n{result.stderr}")
+    try:
+        if not folder or not url:
+            update_sts(messagebox.showwarning, title="Input", message="Please enter both folder path and GitHub URL!")
             return
-    save_history(folder)
-    messagebox.showinfo("Success", "Repository initialization complete!")
+
+        commands = [
+            ['git', '-C', folder, 'init'],
+            ['git', '-C', folder, 'add', '.'],
+            ['git', '-C', folder, 'commit', '-m', 'Initial commit'],
+            ['git', '-C', folder, 'branch', '-M', 'main'],
+            ['git', '-C', folder, 'remote', 'add', 'origin', url],
+            ['git', '-C', folder, 'push', '-u', 'origin', 'main']
+        ]
+
+        for cmd in commands:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                update_sts(messagebox.showerror, title="Git Error", message=f"Failed at: {' '.join(cmd)}\n{result.stderr}")
+                return
+
+        save_history(folder)
+        update_sts(messagebox.showinfo, title="Success", message="Repository initialization complete!")
+
+    finally:
+        update_btns("normal")
+        validate_fields()
+        update_sts(sync_button.config, text="Initialize & Push")
 
 
 def do_all():
     folder = folder_entry.get()
     msg = commit_entry.get()
 
-    update_sts(sync_button.config, text="Processing...")
     update_btns("disabled")
+    update_sts(sync_button.config, text="Processing...")
 
     try:
         if not folder or not msg:
-            messagebox.showwarning("Input", "Please enter both folder path and commit message!")
+            update_sts(messagebox.showwarning, title="Input", message="Please enter both folder path and commit message!")
             return
 
         status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
@@ -114,49 +124,72 @@ def do_all():
         update_sts(messagebox.showinfo, title="Success", message="Repository update complete!")
 
     finally:
-        update_sts(sync_button.config, text="Do All")
         update_btns("normal")
+        validate_fields()
+        update_sts(sync_button.config, text="Do All")
 
 
 def commit_changes():
     folder = folder_entry.get()
     msg = commit_entry.get()
 
-    if not msg:
-        messagebox.showwarning("Input", "Please enter a commit message!")
-        return
+    update_btns("disabled")
+    update_sts(sync_button.config, text="Processing...")
 
-    if not validate_environment(folder): return
+    try:
+        if not msg:
+            update_sts(messagebox.showwarning, title="Input", message="Please enter a commit message!")
+            return
 
-    status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
-    if not status.stdout.strip():
-        messagebox.showinfo("Status", "No changes detected.")
-        return
+        if not validate_environment(folder): return
 
-    subprocess.run(['git', '-C', folder, 'add', '.'])
-    result = subprocess.run(['git', '-C', folder, 'commit', '-m', msg], capture_output=True, text=True)
+        status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
+        if not status.stdout.strip():
+            update_sts(messagebox.showinfo, title="Status", message="No changes detected.")
+            return
 
-    if result.returncode == 0:
-        messagebox.showinfo("Success", "Commits are ready to be pushed.")
-    else:
-        messagebox.showerror("Git Error", result.stderr)
+        subprocess.run(['git', '-C', folder, 'add', '.'])
+        result = subprocess.run(['git', '-C', folder, 'commit', '-m', msg], capture_output=True, text=True)
 
+        if result.returncode == 0:
+            update_sts(messagebox.showinfo, title="Success", message="Commits are ready to be pushed.")
+        else:
+            update_sts(messagebox.showerror, title="Git Error", message=result.stderr)
+
+    finally:
+        update_btns("normal")
+        validate_fields()
+        update_sts(sync_button.config, text="Add & Commit")
 
 def push_to_github():
     folder = folder_entry.get()
-    if not validate_environment(folder): return
 
-    status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
-    if status.stdout.strip():
-        messagebox.showerror("Push Blocked", "Uncommitted changes detected! Please commit them first.")
-        return
+    update_btns("disabled")
+    update_sts(sync_button.config, text="Processing...")
 
-    result = subprocess.run(['git', '-C', folder, 'push', '-u', 'origin', 'main'], capture_output=True, text=True)
-    if result.returncode == 0:
+    try:
+        if not validate_environment(folder): return
+
+        status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
+        if status.stdout.strip():
+            update_sts(messagebox.showerror, title="Push Blocked", message="Uncommitted changes detected! Please commit them first.")
+            return
+
+        result = subprocess.run(['git', '-C', folder, 'push', '-u', 'origin', 'main'], capture_output=True, text=True)
+        if result.returncode == 0:
+            save_history(folder)
+            messagebox.showinfo("Success", "")
+            update_sts(messagebox.showinfo, title="Success", message="Pushed to GitHub!")
+        else:
+            update_sts(messagebox.showerror, title="Push Failed", message=result.stderr)
+
         save_history(folder)
-        messagebox.showinfo("Success", "Pushed to GitHub!")
-    else:
-        messagebox.showerror("Push Failed", result.stderr)
+        update_sts(messagebox.showinfo, title="Success", message="Repository update complete!")
+
+    finally:
+        update_btns("normal")
+        validate_fields()
+        update_sts(sync_button.config, text="Push to GitHub")
 
 
 # ======================================================================================================================
