@@ -265,12 +265,14 @@ def add_placeholder(entry, placeholder):
 # ======================================================================================================================
 
 root = tk.Tk()
-root.title("QuikBash Alpha 1.8")
-root.geometry("400x450")
+root.title("QuikBash Beta 1.0")
+root.geometry("400x480")
 
+# Apply modern theme
 style = ttk.Style()
 style.theme_use('clam')
 
+# Configure basic styling for padding/margin
 folder_var = tk.StringVar()
 url_var = tk.StringVar()
 branch_var = tk.StringVar()
@@ -280,53 +282,56 @@ folder_var.trace_add("write", validate_fields)
 url_var.trace_add("write", validate_fields)
 msg_var.trace_add("write", validate_fields)
 
-tk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(10, 0))
+# Header Section
+ttk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(15, 0))
 folder_entry = ttk.Combobox(root, width=50, textvariable=folder_var)
-folder_entry.pack(pady=5)
+folder_entry.pack(pady=5, padx=20, fill=tk.X)
 folder_entry['values'] = load_history()
 
 tab_control = ttk.Notebook(root)
-tab1 = ttk.Frame(tab_control)
-tab2 = ttk.Frame(tab_control)
+tab1 = ttk.Frame(tab_control, padding=10)
+tab2 = ttk.Frame(tab_control, padding=10)
 tab_control.add(tab1, text="New Repo")
 tab_control.add(tab2, text="Update Repo")
 tab_control.pack(expand=True, fill="both", padx=10, pady=10)
 
 # TAB 1
-# URL entry
-tk.Label(tab1, text="GitHub URL:").pack(pady=(10, 0))
-url_entry = tk.Entry(tab1, width=40, textvariable=url_var)
-url_entry.pack(pady=5)
+ttk.Label(tab1, text="GitHub URL:").pack(pady=(10, 0))
+url_entry = ttk.Entry(tab1, textvariable=url_var)
+url_entry.pack(pady=5, fill=tk.X)
 
-# Init Button
 init_button = ttk.Button(tab1, text="Initialize & Push", command=lambda: run_async(init_new_repo), state="disabled")
 init_button.pack(pady=20)
 
 # TAB 2
-# branch entry
-tk.Label(tab2, text="Branch:").pack(pady=(10, 0))
-branch_entry = tk.Entry(tab2, width=40, textvariable=branch_var)
-branch_entry.pack(pady=5)
+ttk.Label(tab2, text="Branch:").pack(pady=(10, 0))
+branch_entry = ttk.Entry(tab2, textvariable=branch_var)
+branch_entry.pack(pady=5, fill=tk.X)
 add_placeholder(branch_entry, "main")
 
-# message entry
-tk.Label(tab2, text="Commit Message:").pack(pady=(10, 0))
-commit_entry = tk.Entry(tab2, width=40, textvariable=msg_var)
-commit_entry.pack(pady=5)
+ttk.Label(tab2, text="Commit Message:").pack(pady=(10, 0))
+commit_entry = ttk.Entry(tab2, textvariable=msg_var)
+commit_entry.pack(pady=5, fill=tk.X)
 
-# buttons
-anc_button = ttk.Button(tab2, text="Add & Commit", command=lambda: run_async(commit_changes), state="disabled")
-anc_button.pack(pady=(20, 5))
-push_button = ttk.Button(tab2, text="Push to GitHub", command=lambda: run_async(push_to_github), state="disabled")
-push_button.pack(pady=5)
+# Button Columns Container
+button_frame = ttk.Frame(tab2)
+button_frame.pack(pady=(20, 10), fill=tk.X)
+
+anc_button = ttk.Button(button_frame, text="Add & Commit", command=lambda: run_async(commit_changes), state="disabled")
+anc_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 5))
+
+push_button = ttk.Button(button_frame, text="Push to GitHub", command=lambda: run_async(push_to_github), state="disabled")
+push_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(5, 0))
+
+# Full width action button
 sync_button = ttk.Button(tab2, text="Do All", command=lambda: run_async(do_all), state="disabled")
-sync_button.pack(pady=5)
+sync_button.pack(fill=tk.X, pady=5)
 
 # STATUS
-status_frame = tk.Frame(root, bd=1, relief=tk.SUNKEN)
-status_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
+status_frame = ttk.Frame(root, padding=5)
+status_frame.pack(side=tk.BOTTOM, fill=tk.X)
 status_var = tk.StringVar(value="READY")
-status_label = ttk.Label(status_frame, textvariable=status_var)
+status_label = ttk.Label(status_frame, textvariable=status_var, relief="sunken", anchor="center")
 status_label.pack(fill=tk.X)
 
 root.mainloop()
