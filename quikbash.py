@@ -13,10 +13,10 @@ import subprocess
 # prevent tool from freezing during a process
 import threading
 
+from starlette import status
 
 # Variables
 h_file = "qb_history.txt"
-
 
 # ======================================================================================================================
 # VALIDATION
@@ -37,7 +37,6 @@ def validate_fields(*args):
         push_button.config(state="disabled")
         sync_button.config(state="disabled")
 
-
 def validate_environment(folder_name, check_git=True):
     if not os.path.isdir(folder_name):
         messagebox.showerror("Error", f"Path '{folder_name}' is not a valid directory.")
@@ -49,7 +48,6 @@ def validate_environment(folder_name, check_git=True):
             messagebox.showerror("Error", "Not a Git repository. Initialize it first.")
             return False
     return True
-
 
 # ======================================================================================================================
 # COMMANDS
@@ -83,13 +81,12 @@ def init_new_repo():
                 return
 
         save_history(folder)
-        update_sts(messagebox.showinfo, title="Success", message="Repository initialization complete!")
+        set_status("CONNECTED TO GITHUB")
 
     finally:
         update_btns("normal")
         validate_fields()
         update_sts(init_button.config, text="Initialize & Push")
-
 
 def do_all():
     folder = folder_entry.get()
@@ -121,13 +118,12 @@ def do_all():
                 return
 
         save_history(folder)
-        update_sts(messagebox.showinfo, title="Success", message="Repository update complete!")
+        set_status("REPOSITORY UPDATED")
 
     finally:
         update_btns("normal")
         validate_fields()
         update_sts(sync_button.config, text="Do All")
-
 
 def commit_changes():
     folder = folder_entry.get()
@@ -152,7 +148,7 @@ def commit_changes():
         result = subprocess.run(['git', '-C', folder, 'commit', '-m', msg], capture_output=True, text=True)
 
         if result.returncode == 0:
-            update_sts(messagebox.showinfo, title="Success", message="Commits are ready to be pushed.")
+            set_status("READY TO PUSH")
         else:
             update_sts(messagebox.showerror, title="Git Error", message=result.stderr)
 
@@ -178,7 +174,7 @@ def push_to_github():
         result = subprocess.run(['git', '-C', folder, 'push', '-u', 'origin', 'main'], capture_output=True, text=True)
         if result.returncode == 0:
             save_history(folder)
-            update_sts(messagebox.showinfo, title="Success", message="Pushed to GitHub!")
+            set_status("REPOSITORY UPDATED")
         else:
             update_sts(messagebox.showerror, title="Push Failed", message=result.stderr)
 
@@ -186,7 +182,6 @@ def push_to_github():
         update_btns("normal")
         validate_fields()
         update_sts(push_button.config, text="Push to GitHub")
-
 
 # ======================================================================================================================
 # HISTORY
@@ -210,7 +205,6 @@ def save_history(path):
         f.write('\n'.join(history))
     folder_entry['values'] = history
 
-
 # ======================================================================================================================
 # HELPERS
 # ======================================================================================================================
@@ -229,6 +223,8 @@ def update_btns(state):
     for btn in buttons:
         update_sts(btn.config, state=state)
 
+def set_status(text):
+    update_sts(status_var.set, value=text)
 
 # ======================================================================================================================
 # INTERFACE
@@ -275,5 +271,13 @@ push_button = tk.Button(tab2, text="Push to GitHub", command=lambda: run_async(p
 push_button.pack(pady=5)
 sync_button = tk.Button(tab2, text="Do All", command=lambda: run_async(do_all), state="disabled")
 sync_button.pack(pady=5)
+
+# STATUS
+status_frame = tk.Frame(root, bd=1, relief=tk.SUNKEN)
+status_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
+
+status_var = tk.StringVar(value="READY")
+status_label = ttk.Label(status_frame, textvariable=status_var)
+status_label.pack(fill=tk.X)
 
 root.mainloop()
