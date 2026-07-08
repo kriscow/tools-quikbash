@@ -52,8 +52,8 @@ def validate_environment(folder_name, check_git=True):
 # ======================================================================================================================
 
 def init_new_repo():
-    folder = folder_entry.get()
-    url = url_entry.get()
+    folder = folder_entry.get().strip()
+    url = url_entry.get().strip()
 
     update_btns("disabled")
     update_sts(init_button.config, text="Processing...")
@@ -87,9 +87,9 @@ def init_new_repo():
         update_sts(init_button.config, text="Initialize & Push")
 
 def do_all():
-    folder = folder_entry.get()
-    branch = branch_var.get()
-    msg = commit_entry.get()
+    folder = folder_entry.get().strip()
+    branch = branch_var.get().strip()
+    msg = commit_entry.get().strip()
 
     update_btns("disabled")
     update_sts(sync_button.config, text="Processing...")
@@ -99,8 +99,9 @@ def do_all():
             update_sts(messagebox.showwarning, title="Input", message="Please fill up all entry fields.")
             return
 
-        if not branch or branch == "main":
+        if not branch:
             branch = "main"
+            branch_var.set("main")
 
         checkout_res = subprocess.run(['git', '-C', folder, 'checkout', branch], capture_output=True, text=True)
         if checkout_res.returncode != 0:
@@ -140,8 +141,8 @@ def do_all():
         update_sts(sync_button.config, text="Do All")
 
 def commit_changes():
-    folder = folder_entry.get()
-    msg = commit_entry.get()
+    folder = folder_entry.get().strip()
+    msg = commit_entry.get().strip()
 
     update_btns("disabled")
     update_sts(anc_button.config, text="Processing...")
@@ -172,8 +173,8 @@ def commit_changes():
         update_sts(anc_button.config, text="Add & Commit")
 
 def push_to_github():
-    folder = folder_entry.get()
-    branch = branch_var.get()
+    folder = folder_entry.get().strip()
+    branch = branch_var.get().strip()
 
     update_btns("disabled")
     update_sts(push_button.config, text="Processing...")
@@ -181,8 +182,9 @@ def push_to_github():
     try:
         if not validate_environment(folder): return
 
-        if not branch or branch == "main":
+        if not branch:
             branch = "main"
+            branch_var.set("main")
 
         checkout_res = subprocess.run(['git', '-C', folder, 'checkout', branch], capture_output=True, text=True)
         if checkout_res.returncode != 0:
