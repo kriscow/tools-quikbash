@@ -178,13 +178,9 @@ def push_to_github():
         result = subprocess.run(['git', '-C', folder, 'push', '-u', 'origin', 'main'], capture_output=True, text=True)
         if result.returncode == 0:
             save_history(folder)
-            messagebox.showinfo("Success", "")
             update_sts(messagebox.showinfo, title="Success", message="Pushed to GitHub!")
         else:
             update_sts(messagebox.showerror, title="Push Failed", message=result.stderr)
-
-        save_history(folder)
-        update_sts(messagebox.showinfo, title="Success", message="Repository update complete!")
 
     finally:
         update_btns("normal")
