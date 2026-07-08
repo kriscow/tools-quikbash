@@ -60,7 +60,7 @@ def init_new_repo():
     url = url_entry.get()
 
     update_btns("disabled")
-    update_sts(sync_button.config, text="Processing...")
+    update_sts(init_button.config, text="Processing...")
 
     try:
         if not folder or not url:
@@ -88,7 +88,7 @@ def init_new_repo():
     finally:
         update_btns("normal")
         validate_fields()
-        update_sts(sync_button.config, text="Initialize & Push")
+        update_sts(init_button.config, text="Initialize & Push")
 
 
 def do_all():
@@ -134,7 +134,7 @@ def commit_changes():
     msg = commit_entry.get()
 
     update_btns("disabled")
-    update_sts(sync_button.config, text="Processing...")
+    update_sts(anc_button.config, text="Processing...")
 
     try:
         if not msg:
@@ -159,13 +159,13 @@ def commit_changes():
     finally:
         update_btns("normal")
         validate_fields()
-        update_sts(sync_button.config, text="Add & Commit")
+        update_sts(anc_button.config, text="Add & Commit")
 
 def push_to_github():
     folder = folder_entry.get()
 
     update_btns("disabled")
-    update_sts(sync_button.config, text="Processing...")
+    update_sts(push_button.config, text="Processing...")
 
     try:
         if not validate_environment(folder): return
@@ -189,7 +189,7 @@ def push_to_github():
     finally:
         update_btns("normal")
         validate_fields()
-        update_sts(sync_button.config, text="Push to GitHub")
+        update_sts(push_button.config, text="Push to GitHub")
 
 
 # ======================================================================================================================
