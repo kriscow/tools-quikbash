@@ -268,74 +268,56 @@ root = tk.Tk()
 root.title("QuikBash Beta 1.0")
 root.geometry("400x480")
 
-# Apply to Style
+# style
 style = ttk.Style()
 style.theme_use('clam')
 
-# Palette
+# palette
 orange = "#FF7F11"
 dark = "#262626"
 white = "#FFFFFF"
 lime = "#ACBFA4"
 
-# 1. Root & Base
+# root
 root.configure(background=white)
 style.configure(".", background=white, foreground=dark, fieldbackground=white)
 
-# 2. Buttons (Dark background, Orange hover, White text)
+# buttons
 style.configure("TButton", background=dark, foreground=white, borderwidth=0, padding=6)
-# When hovered, change to orange. When disabled, keep it gray.
-style.map("TButton",
-          background=[("active", orange), ("disabled", "#D0D0D0")],
-          foreground=[("active", white), ("disabled", "#888888")])
+style.map("TButton", background=[("active", orange), ("disabled", "#D0D0D0")], foreground=[("active", white), ("disabled", "#888888")])
 
-# 3. Notebook (Tabs) - Simplified and Robust
+# tabs
 style.configure("TNotebook", background=white, borderwidth=0)
-style.configure("TNotebook.Tab",
-                background="#F0F0F0",
-                foreground=dark,
-                padding=[20, 8]) # Increased horizontal padding
+style.configure("TNotebook.Tab", background="#F0F0F0", foreground=dark, padding=[20, 8]) # Increased horizontal padding
+style.map("TNotebook.Tab", background=[("selected", orange)], foreground=[("selected", white)], padding=[("selected", [20, 8])]) # Crucial: Force same padding when selected
 
-# Force the selected state to use the exact same padding
-style.map("TNotebook.Tab",
-          background=[("selected", orange)],
-          foreground=[("selected", white)],
-          padding=[("selected", [20, 8])]) # Crucial: Force same padding when selected
-
-# 4. Entries & Combobox
+# entry, combobox
 style.configure("TEntry", fieldbackground=white, bordercolor=dark, lightcolor=dark)
 style.configure("TCombobox", fieldbackground=white, bordercolor=dark)
+style.map("TEntry", fieldbackground=[("focus", white)], selectbackground=[("!disabled", dark)], selectforeground=[("!disabled", white)])
+style.map("TCombobox", fieldbackground=[("focus", white)], selectbackground=[("!disabled", dark)], selectforeground=[("!disabled", white)])
 
-# Add this to your style block to globally control selection colors
-style.map("TEntry",
-          fieldbackground=[("focus", white)],
-          selectbackground=[("!disabled", dark)],
-          selectforeground=[("!disabled", white)])
-
-style.map("TCombobox",
-          fieldbackground=[("focus", white)],
-          selectbackground=[("!disabled", dark)],
-          selectforeground=[("!disabled", white)])
-
-# 5. Status Bar
+# status
 style.configure("Status.TLabel", background=lime, foreground=dark, padding=10)
 
-# Configure basic styling for padding/margin
+# entry variables
 folder_var = tk.StringVar()
 url_var = tk.StringVar()
 branch_var = tk.StringVar()
 msg_var = tk.StringVar()
 
+# for validation
 folder_var.trace_add("write", validate_fields)
 url_var.trace_add("write", validate_fields)
 msg_var.trace_add("write", validate_fields)
 
-# Header Section
+# header
 ttk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(15, 0))
 folder_entry = ttk.Combobox(root, width=50, textvariable=folder_var)
 folder_entry.pack(pady=20, padx=20, fill=tk.X)
 folder_entry['values'] = load_history()
 
+# tab control
 tab_control = ttk.Notebook(root)
 tab1 = ttk.Frame(tab_control, padding=10)
 tab2 = ttk.Frame(tab_control, padding=10)
@@ -361,7 +343,6 @@ ttk.Label(tab2, text="Commit Message:").pack(pady=(10, 0))
 commit_entry = ttk.Entry(tab2, textvariable=msg_var)
 commit_entry.pack(pady=5, fill=tk.X)
 
-# Button Columns Container
 button_frame = ttk.Frame(tab2)
 button_frame.pack(pady=(20, 10), fill=tk.X)
 
@@ -371,7 +352,6 @@ anc_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 5))
 push_button = ttk.Button(button_frame, text="Push to GitHub", command=lambda: run_async(push_to_github), state="disabled")
 push_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(5, 0))
 
-# Full width action button
 sync_button = ttk.Button(tab2, text="Do All", command=lambda: run_async(do_all), state="disabled")
 sync_button.pack(fill=tk.X, pady=5)
 
