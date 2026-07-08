@@ -5,6 +5,7 @@ import subprocess                   # py <> CLI communication
 import threading                    # freeze prevention
 
 h_file = "qb_history.txt"
+startup_flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
 
 # ======================================================================================================================
 # VALIDATION
@@ -36,8 +37,7 @@ def validate_environment(folder_name, check_git=True):
         messagebox.showerror("Error", f"Path '{folder_name}' is not a valid directory.")
         return False
     if check_git:
-        result = subprocess.run(['git', '-C', folder_name, 'rev-parse', '--is-inside-work-tree'],
-                                capture_output=True, text=True)
+        result = subprocess.run(['git', '-C', folder_name, 'rev-parse', '--is-inside-work-tree'], capture_output=True, text=True, creationflags=startup_flags)
         if result.returncode != 0:
             messagebox.showerror("Error", "Not a Git repository. Initialize it first.")
             return False
@@ -72,7 +72,7 @@ def init_new_repo():
         ]
 
         for cmd in commands:
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, creationflags=startup_flags)
             if result.returncode != 0:
                 update_sts(messagebox.showerror, title="Git Error", message=f"Failed at: {' '.join(cmd)}\n{result.stderr}")
                 return
@@ -105,9 +105,9 @@ def do_all():
             branch = "main"
             branch_var.set("main")
 
-        checkout_res = subprocess.run(['git', '-C', folder, 'checkout', branch], capture_output=True, text=True)
+        checkout_res = subprocess.run(['git', '-C', folder, 'checkout', branch], capture_output=True, text=True, creationflags=startup_flags)
         if checkout_res.returncode != 0:
-            create_res = subprocess.run(['git', '-C', folder, 'checkout', '-b', branch], capture_output=True, text=True)
+            create_res = subprocess.run(['git', '-C', folder, 'checkout', '-b', branch], capture_output=True, text=True, creationflags=startup_flags)
             if create_res.returncode != 0:
                 update_sts(messagebox.showerror, title="Git Error",
                            message=f"Could not create to branch '{branch}':\n{checkout_res.stderr}")
@@ -117,7 +117,7 @@ def do_all():
         else:
             set_status(f"SWITCHED TO BRANCH: {branch}")
 
-        status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
+        status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True, creationflags=startup_flags)
         if not status.stdout.strip():
             update_sts(messagebox.showinfo, title="Status", message="No changes detected.")
             return
@@ -129,7 +129,7 @@ def do_all():
         ]
 
         for cmd in commands:
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, creationflags=startup_flags)
             if result.returncode != 0:
                 update_sts(messagebox.showerror, title="Git Error", message="Failed!")
                 return
@@ -159,13 +159,13 @@ def commit_changes():
 
         if not validate_environment(folder): return
 
-        status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
+        status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True, creationflags=startup_flags)
         if not status.stdout.strip():
             update_sts(messagebox.showinfo, title="Status", message="No changes detected.")
             return
 
-        subprocess.run(['git', '-C', folder, 'add', '.'])
-        result = subprocess.run(['git', '-C', folder, 'commit', '-m', msg], capture_output=True, text=True)
+        subprocess.run(['git', '-C', folder, 'add', '.'], creationflags=startup_flags)
+        result = subprocess.run(['git', '-C', folder, 'commit', '-m', msg], capture_output=True, text=True, creationflags=startup_flags)
 
         if result.returncode == 0:
             set_status("READY TO PUSH")
@@ -194,9 +194,9 @@ def push_to_github():
             branch = "main"
             branch_var.set("main")
 
-        checkout_res = subprocess.run(['git', '-C', folder, 'checkout', branch], capture_output=True, text=True)
+        checkout_res = subprocess.run(['git', '-C', folder, 'checkout', branch], capture_output=True, text=True, creationflags=startup_flags)
         if checkout_res.returncode != 0:
-            create_res = subprocess.run(['git', '-C', folder, 'checkout', '-b', branch], capture_output=True, text=True)
+            create_res = subprocess.run(['git', '-C', folder, 'checkout', '-b', branch], capture_output=True, text=True, creationflags=startup_flags)
             if create_res.returncode != 0:
                 update_sts(messagebox.showerror, title="Git Error", message=f"Could not create to branch '{branch}':\n{checkout_res.stderr}")
                 return
@@ -206,19 +206,19 @@ def push_to_github():
             set_status(f"SWITCHED TO BRANCH: {branch}")
 
         # Do not push if changes are uncommitted
-        status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
+        status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True, creationflags=startup_flags)
         if status.stdout.strip():
             update_sts(messagebox.showerror, title="Push Blocked", message="Uncommitted changes detected! Please commit them first.")
             return
 
         # Do not push if version is up to date
-        check_push = subprocess.run(['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'], capture_output=True, text=True)
+        check_push = subprocess.run(['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'], capture_output=True, text=True, creationflags=startup_flags)
         if not check_push.stdout.strip():
             update_sts(messagebox.showinfo, title="Push Status", message="Everything is already up to date!")
             return
 
         # Push if previous checks are not met
-        result = subprocess.run(['git', '-C', folder, 'push', '-u', 'origin', branch], capture_output=True, text=True)
+        result = subprocess.run(['git', '-C', folder, 'push', '-u', 'origin', branch], capture_output=True, text=True, creationflags=startup_flags)
         if result.returncode == 0:
             save_history(folder)
             set_status("REPOSITORY UPDATED")
