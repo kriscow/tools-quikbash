@@ -7,10 +7,12 @@ It is perfect for users who just want to get their code pushed without the wait.
 ---
 
 ## 🟢 Overview
-*  **Engine:** Python 2026.1.1
-*  **Developer:** KRISCOW
-*  **Format:** Desktop Tool
-*  **Version:** Beta 1.1
+| Property | Details |
+|:-----|:-----|
+| **Engine** | Python 2026.1.1 |
+| **Developer** | KRISCOW |
+| **Format** | Desktop Tool |
+| **Version** | Beta 1.1 |
 
 ---
 
