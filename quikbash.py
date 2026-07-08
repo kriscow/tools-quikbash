@@ -85,7 +85,8 @@ def do_all():
     folder = folder_entry.get()
     msg = commit_entry.get()
 
-    update_ui(sync_button.config, text="Processing...", state="disabled")
+    update_sts(sync_button.config, text="Processing...")
+    update_btns("disabled")
 
     try:
         if not folder or not msg:
@@ -94,7 +95,7 @@ def do_all():
 
         status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
         if not status.stdout.strip():
-            update_ui(messagebox.showinfo, title="Status", message="No changes detected.")
+            update_sts(messagebox.showinfo, title="Status", message="No changes detected.")
             return
 
         commands = [
@@ -106,14 +107,15 @@ def do_all():
         for cmd in commands:
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
-                update_ui(messagebox.showerror, title="Git Error", message="Failed!")
+                update_sts(messagebox.showerror, title="Git Error", message="Failed!")
                 return
 
         save_history(folder)
-        update_ui(messagebox.showinfo, title="Success", message="Repository update complete!")
+        update_sts(messagebox.showinfo, title="Success", message="Repository update complete!")
 
     finally:
-        update_ui(sync_button.config, text="Do All", state="normal")
+        update_sts(sync_button.config, text="Do All")
+        update_btns("normal")
 
 
 def commit_changes():
@@ -181,14 +183,23 @@ def save_history(path):
 
 
 # ======================================================================================================================
-# THREADING
+# HELPERS
 # ======================================================================================================================
 
+# threading
 def run_async(func):
     threading.Thread(target=func, daemon=True).start()
 
-def update_ui(func, **kwargs):
+# process status
+def update_sts(func, **kwargs):
     root.after(0, lambda: func(**kwargs))
+
+# button status
+def update_btns(state):
+    buttons = [init_button, anc_button, push_button, sync_button]
+    for btn in buttons:
+        update_sts(btn.config, state=state)
+
 
 # ======================================================================================================================
 # INTERFACE
