@@ -11,8 +11,11 @@ import os
 import subprocess
 
 
+h_file = "qb_history.txt"
+
+
 # ======================================================================================================================
-# FUNCTIONS
+# FUNCTIONS - VALIDATION
 # ======================================================================================================================
 
 def validate_fields(*args):
@@ -44,6 +47,10 @@ def validate_environment(folder_name, check_git=True):
     return True
 
 
+# ======================================================================================================================
+# FUNCTIONS - COMMANDS
+# ======================================================================================================================
+
 def init_new_repo():
     folder = folder_entry.get()
     url = url_entry.get()
@@ -65,6 +72,7 @@ def init_new_repo():
         if result.returncode != 0:
             messagebox.showerror("Git Error", f"Failed at: {' '.join(cmd)}\n{result.stderr}")
             return
+    save_history(folder)
     messagebox.showinfo("Success", "Repository initialization complete!")
 
 
@@ -91,6 +99,7 @@ def do_all():
         if result.returncode != 0:
             messagebox.showerror("Git Error", f"Failed at: {' '.join(cmd)}\n{result.stderr}")
             return
+    save_history(folder)
     messagebox.showinfo("Success", "Repository update complete!")
 
 
@@ -129,17 +138,40 @@ def push_to_github():
 
     result = subprocess.run(['git', '-C', folder, 'push', '-u', 'origin', 'main'], capture_output=True, text=True)
     if result.returncode == 0:
+        save_history(folder)
         messagebox.showinfo("Success", "Pushed to GitHub!")
     else:
         messagebox.showerror("Push Failed", result.stderr)
 
 
 # ======================================================================================================================
+# FUNCTIONS - HISTORY
+# ======================================================================================================================
+
+def load_history():
+    if os.path.exists(h_file):
+        with open(h_file, 'r') as f:
+            return [line.strip() for line in f.readlines() if line.strip()]
+    return []
+
+def save_history(path):
+    history = load_history()
+
+    if path in history:
+        history.remove(path)
+    history.insert(0, path)
+    history = history[:5]
+
+    with open(h_file, 'w') as f:
+        f.write('\n'.join(history))
+    folder_entry['values'] = history
+
+# ======================================================================================================================
 # INTERFACE
 # ======================================================================================================================
 
 root = tk.Tk()
-root.title("QuikBash Alpha 1.2")
+root.title("QuikBash Alpha 1.4")
 root.geometry("400x450")
 
 folder_var = tk.StringVar()
@@ -151,8 +183,9 @@ url_var.trace_add("write", validate_fields)
 msg_var.trace_add("write", validate_fields)
 
 tk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(10, 0))
-folder_entry = tk.Entry(root, width=50, textvariable=folder_var)
+folder_entry = ttk.Combobox(root, width=50, textvariable=folder_var)
 folder_entry.pack(pady=5)
+folder_entry['values'] = load_history()
 
 tab_control = ttk.Notebook(root)
 tab1 = ttk.Frame(tab_control)
@@ -161,14 +194,14 @@ tab_control.add(tab1, text="New Repo")
 tab_control.add(tab2, text="Update Repo")
 tab_control.pack(expand=True, fill="both", padx=10, pady=10)
 
-# Tab 1
+# TAB 1
 tk.Label(tab1, text="GitHub URL:").pack(pady=(10, 0))
 url_entry = tk.Entry(tab1, width=40, textvariable=url_var)
 url_entry.pack(pady=5)
 init_button = tk.Button(tab1, text="Initialize & Push", command=init_new_repo, state="disabled")
 init_button.pack(pady=20)
 
-# Tab 2
+# TAB 2
 tk.Label(tab2, text="Commit Message:").pack(pady=(10, 0))
 commit_entry = tk.Entry(tab2, width=40, textvariable=msg_var)
 commit_entry.pack(pady=5)
