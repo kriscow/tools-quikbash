@@ -205,11 +205,19 @@ def push_to_github():
         else:
             set_status(f"SWITCHED TO BRANCH: {branch}")
 
+        # Do not push if changes are uncommitted
         status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
         if status.stdout.strip():
             update_sts(messagebox.showerror, title="Push Blocked", message="Uncommitted changes detected! Please commit them first.")
             return
 
+        # Do not push if version is up to date
+        check_push = subprocess.run(['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'], capture_output=True, text=True)
+        if not check_push.stdout.strip():
+            update_sts(messagebox.showinfo, title="Push Status", message="Everything is already up to date!")
+            return
+
+        # Push if previous checks are not met
         result = subprocess.run(['git', '-C', folder, 'push', '-u', 'origin', branch], capture_output=True, text=True)
         if result.returncode == 0:
             save_history(folder)
