@@ -268,6 +268,9 @@ root = tk.Tk()
 root.title("QuikBash Alpha 1.8")
 root.geometry("400x450")
 
+style = ttk.Style()
+style.theme_use('clam')
+
 folder_var = tk.StringVar()
 url_var = tk.StringVar()
 branch_var = tk.StringVar()
@@ -296,7 +299,7 @@ url_entry = tk.Entry(tab1, width=40, textvariable=url_var)
 url_entry.pack(pady=5)
 
 # Init Button
-init_button = tk.Button(tab1, text="Initialize & Push", command=lambda: run_async(init_new_repo), state="disabled")
+init_button = ttk.Button(tab1, text="Initialize & Push", command=lambda: run_async(init_new_repo), state="disabled")
 init_button.pack(pady=20)
 
 # TAB 2
@@ -312,11 +315,11 @@ commit_entry = tk.Entry(tab2, width=40, textvariable=msg_var)
 commit_entry.pack(pady=5)
 
 # buttons
-anc_button = tk.Button(tab2, text="Add & Commit", command=lambda: run_async(commit_changes), state="disabled")
+anc_button = ttk.Button(tab2, text="Add & Commit", command=lambda: run_async(commit_changes), state="disabled")
 anc_button.pack(pady=(20, 5))
-push_button = tk.Button(tab2, text="Push to GitHub", command=lambda: run_async(push_to_github), state="disabled")
+push_button = ttk.Button(tab2, text="Push to GitHub", command=lambda: run_async(push_to_github), state="disabled")
 push_button.pack(pady=5)
-sync_button = tk.Button(tab2, text="Do All", command=lambda: run_async(do_all), state="disabled")
+sync_button = ttk.Button(tab2, text="Do All", command=lambda: run_async(do_all), state="disabled")
 sync_button.pack(pady=5)
 
 # STATUS
