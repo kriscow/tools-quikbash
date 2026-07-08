@@ -231,7 +231,7 @@ def set_status(text):
 # ======================================================================================================================
 
 root = tk.Tk()
-root.title("QuikBash Alpha 1.6")
+root.title("QuikBash Alpha 1.7")
 root.geometry("400x450")
 
 folder_var = tk.StringVar()
