@@ -48,6 +48,32 @@ def init_new_repo():
     messagebox.showinfo("Success", "Repository initialization complete!")
 
 
+def do_all():
+    folder = folder_entry.get()
+    msg = commit_entry.get()
+    if not folder or not msg:
+        messagebox.showwarning("Input", "Please enter both folder path and commit message!")
+        return
+
+    commands = [
+        ['git', '-C', folder, 'add', '.'],
+        ['git', '-C', folder, 'commit', '-m', msg],
+        ['git', '-C', folder, 'push', '-u', 'origin', 'main']
+    ]
+
+    status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
+    if not status.stdout.strip():
+        messagebox.showinfo("Status", "No changes detected.")
+        return
+
+    for cmd in commands:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            messagebox.showerror("Git Error", f"Failed at: {' '.join(cmd)}\n{result.stderr}")
+            return
+    messagebox.showinfo("Success", "Repository update complete!")
+
+
 def commit_changes():
     folder = folder_entry.get()
     msg = commit_entry.get()
@@ -91,7 +117,7 @@ def push_to_github():
 # --- GUI Setup ---
 
 root = tk.Tk()
-root.title("QuikBash Alpha 1.1")
+root.title("QuikBash Alpha 1.2")
 root.geometry("400x450")
 
 tk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(10, 0))
@@ -117,5 +143,6 @@ commit_entry = tk.Entry(tab2, width=40)
 commit_entry.pack(pady=5)
 tk.Button(tab2, text="Add & Commit", command=commit_changes).pack(pady=(20, 5))
 tk.Button(tab2, text="Push to GitHub", command=push_to_github).pack(pady=5)
+tk.Button(tab2, text="Do All", command=do_all).pack(pady=5)
 
 root.mainloop()
