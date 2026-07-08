@@ -13,8 +13,6 @@ import subprocess
 # prevent tool from freezing during a process
 import threading
 
-from starlette import status
-
 # Variables
 h_file = "qb_history.txt"
 
@@ -90,6 +88,7 @@ def init_new_repo():
 
 def do_all():
     folder = folder_entry.get()
+    branch = branch_var.get()
     msg = commit_entry.get()
 
     update_btns("disabled")
@@ -97,8 +96,23 @@ def do_all():
 
     try:
         if not folder or not msg:
-            update_sts(messagebox.showwarning, title="Input", message="Please enter both folder path and commit message!")
+            update_sts(messagebox.showwarning, title="Input", message="Please fill up all entry fields.")
             return
+
+        if not branch:
+            branch = "main"
+
+        checkout_res = subprocess.run(['git', '-C', folder, 'checkout', branch], capture_output=True, text=True)
+        if checkout_res.returncode != 0:
+            create_res = subprocess.run(['git', '-C', folder, 'checkout', '-b', branch], capture_output=True, text=True)
+            if create_res.returncode != 0:
+                update_sts(messagebox.showerror, title="Git Error",
+                           message=f"Could not create to branch '{branch}':\n{checkout_res.stderr}")
+                return
+            else:
+                set_status(f"CREATED % SWITCHED TO BRANCH: {branch}")
+        else:
+            set_status(f"SWITCHED TO BRANCH: {branch}")
 
         status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
         if not status.stdout.strip():
@@ -108,7 +122,7 @@ def do_all():
         commands = [
             ['git', '-C', folder, 'add', '.'],
             ['git', '-C', folder, 'commit', '-m', msg],
-            ['git', '-C', folder, 'push', '-u', 'origin', 'main']
+            ['git', '-C', folder, 'push', '-u', 'origin', branch]
         ]
 
         for cmd in commands:
@@ -159,6 +173,7 @@ def commit_changes():
 
 def push_to_github():
     folder = folder_entry.get()
+    branch = branch_var.get()
 
     update_btns("disabled")
     update_sts(push_button.config, text="Processing...")
@@ -166,12 +181,26 @@ def push_to_github():
     try:
         if not validate_environment(folder): return
 
+        if not branch:
+            branch = "main"
+
+        checkout_res = subprocess.run(['git', '-C', folder, 'checkout', branch], capture_output=True, text=True)
+        if checkout_res.returncode != 0:
+            create_res = subprocess.run(['git', '-C', folder, 'checkout', '-b', branch], capture_output=True, text=True)
+            if create_res.returncode != 0:
+                update_sts(messagebox.showerror, title="Git Error", message=f"Could not create to branch '{branch}':\n{checkout_res.stderr}")
+                return
+            else:
+                set_status(f"CREATED % SWITCHED TO BRANCH: {branch}")
+        else:
+            set_status(f"SWITCHED TO BRANCH: {branch}")
+
         status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'], capture_output=True, text=True)
         if status.stdout.strip():
             update_sts(messagebox.showerror, title="Push Blocked", message="Uncommitted changes detected! Please commit them first.")
             return
 
-        result = subprocess.run(['git', '-C', folder, 'push', '-u', 'origin', 'main'], capture_output=True, text=True)
+        result = subprocess.run(['git', '-C', folder, 'push', '-u', 'origin', branch], capture_output=True, text=True)
         if result.returncode == 0:
             save_history(folder)
             set_status("REPOSITORY UPDATED")
@@ -231,11 +260,12 @@ def set_status(text):
 # ======================================================================================================================
 
 root = tk.Tk()
-root.title("QuikBash Alpha 1.7")
+root.title("QuikBash Alpha 1.8")
 root.geometry("400x450")
 
 folder_var = tk.StringVar()
 url_var = tk.StringVar()
+branch_var = tk.StringVar()
 msg_var = tk.StringVar()
 
 folder_var.trace_add("write", validate_fields)
@@ -255,16 +285,27 @@ tab_control.add(tab2, text="Update Repo")
 tab_control.pack(expand=True, fill="both", padx=10, pady=10)
 
 # TAB 1
+# URL entry
 tk.Label(tab1, text="GitHub URL:").pack(pady=(10, 0))
 url_entry = tk.Entry(tab1, width=40, textvariable=url_var)
 url_entry.pack(pady=5)
+
+# Init Button
 init_button = tk.Button(tab1, text="Initialize & Push", command=lambda: run_async(init_new_repo), state="disabled")
 init_button.pack(pady=20)
 
 # TAB 2
+# branch entry
+tk.Label(tab2, text="Branch:").pack(pady=(10, 0))
+branch_entry = tk.Entry(tab2, width=40, textvariable=branch_var)
+branch_entry.pack(pady=5)
+
+# message entry
 tk.Label(tab2, text="Commit Message:").pack(pady=(10, 0))
 commit_entry = tk.Entry(tab2, width=40, textvariable=msg_var)
 commit_entry.pack(pady=5)
+
+# buttons
 anc_button = tk.Button(tab2, text="Add & Commit", command=lambda: run_async(commit_changes), state="disabled")
 anc_button.pack(pady=(20, 5))
 push_button = tk.Button(tab2, text="Push to GitHub", command=lambda: run_async(push_to_github), state="disabled")
@@ -275,7 +316,6 @@ sync_button.pack(pady=5)
 # STATUS
 status_frame = tk.Frame(root, bd=1, relief=tk.SUNKEN)
 status_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
-
 status_var = tk.StringVar(value="READY")
 status_label = ttk.Label(status_frame, textvariable=status_var)
 status_label.pack(fill=tk.X)
