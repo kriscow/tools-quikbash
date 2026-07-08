@@ -231,8 +231,11 @@ def load_history():
     """Load the (5) most recently initialized/updated repositories."""
 
     if os.path.exists(h_file):
-        with open(h_file, 'r') as f:
-            return [line.strip() for line in f.readlines() if line.strip()]
+        try:
+            with open(h_file, 'r') as f:
+                return [line.strip() for line in f.readlines() if line.strip()]
+        except Exception:
+            return []
     return []
 
 def save_history(path):

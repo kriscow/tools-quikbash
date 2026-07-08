@@ -1,0 +1,13 @@
+# IDE settings
+.idea/
+
+# Build (PyInstaller)
+build/
+dist/
+
+# Local data
+qb_history.txt
+
+# Python cache
+__pycache__/
+*.pyc
