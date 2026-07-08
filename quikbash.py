@@ -265,8 +265,8 @@ def add_placeholder(entry, placeholder):
 # ======================================================================================================================
 
 root = tk.Tk()
-root.title("QuikBash Beta 1.0")
-root.geometry("400x480")
+root.title("QuikBash Beta 1.1")
+root.geometry("500x450")
 
 # style
 style = ttk.Style()
@@ -312,9 +312,9 @@ url_var.trace_add("write", validate_fields)
 msg_var.trace_add("write", validate_fields)
 
 # header
-ttk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(15, 0))
+ttk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(20, 0))
 folder_entry = ttk.Combobox(root, width=50, textvariable=folder_var)
-folder_entry.pack(pady=20, padx=20, fill=tk.X)
+folder_entry.pack(pady=(5, 30), padx=20, fill=tk.X)
 folder_entry['values'] = load_history()
 
 # tab control
