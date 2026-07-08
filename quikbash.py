@@ -268,9 +268,56 @@ root = tk.Tk()
 root.title("QuikBash Beta 1.0")
 root.geometry("400x480")
 
-# Apply modern theme
+# Apply to Style
 style = ttk.Style()
 style.theme_use('clam')
+
+# Palette
+orange = "#FF7F11"
+dark = "#262626"
+white = "#FFFFFF"
+
+# 1. Root & Base
+root.configure(background=white)
+style.configure(".", background=white, foreground=dark, fieldbackground=white)
+
+# 2. Buttons (Dark background, Orange hover, White text)
+style.configure("TButton", background=dark, foreground=white, borderwidth=0, padding=6)
+# When hovered, change to orange. When disabled, keep it gray.
+style.map("TButton",
+          background=[("active", orange), ("disabled", "#D0D0D0")],
+          foreground=[("active", white), ("disabled", "#888888")])
+
+# 3. Notebook (Tabs) - Simplified and Robust
+style.configure("TNotebook", background=white, borderwidth=0)
+style.configure("TNotebook.Tab",
+                background="#F0F0F0",
+                foreground=dark,
+                padding=[20, 8]) # Increased horizontal padding
+
+# Force the selected state to use the exact same padding
+style.map("TNotebook.Tab",
+          background=[("selected", orange)],
+          foreground=[("selected", white)],
+          padding=[("selected", [20, 8])]) # Crucial: Force same padding when selected
+
+# 4. Entries & Combobox
+style.configure("TEntry", fieldbackground=white, bordercolor=dark, lightcolor=dark)
+style.configure("TCombobox", fieldbackground=white, bordercolor=dark)
+
+# Add this to your style block to globally control selection colors
+style.map("TEntry",
+          fieldbackground=[("focus", white)],
+          selectbackground=[("!disabled", dark)],
+          selectforeground=[("!disabled", white)])
+
+style.map("TCombobox",
+          fieldbackground=[("focus", white)],
+          selectbackground=[("!disabled", dark)],
+          selectforeground=[("!disabled", white)])
+
+# 5. Status Bar
+style.configure("Status.TLabel", background=dark, foreground=white, padding=10)
 
 # Configure basic styling for padding/margin
 folder_var = tk.StringVar()
@@ -285,7 +332,7 @@ msg_var.trace_add("write", validate_fields)
 # Header Section
 ttk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(15, 0))
 folder_entry = ttk.Combobox(root, width=50, textvariable=folder_var)
-folder_entry.pack(pady=5, padx=20, fill=tk.X)
+folder_entry.pack(pady=20, padx=20, fill=tk.X)
 folder_entry['values'] = load_history()
 
 tab_control = ttk.Notebook(root)
@@ -293,7 +340,7 @@ tab1 = ttk.Frame(tab_control, padding=10)
 tab2 = ttk.Frame(tab_control, padding=10)
 tab_control.add(tab1, text="New Repo")
 tab_control.add(tab2, text="Update Repo")
-tab_control.pack(expand=True, fill="both", padx=10, pady=10)
+tab_control.pack(expand=True, fill="both", padx=10)
 
 # TAB 1
 ttk.Label(tab1, text="GitHub URL:").pack(pady=(10, 0))
@@ -301,7 +348,7 @@ url_entry = ttk.Entry(tab1, textvariable=url_var)
 url_entry.pack(pady=5, fill=tk.X)
 
 init_button = ttk.Button(tab1, text="Initialize & Push", command=lambda: run_async(init_new_repo), state="disabled")
-init_button.pack(pady=20)
+init_button.pack(fill=tk.X, pady=5)
 
 # TAB 2
 ttk.Label(tab2, text="Branch:").pack(pady=(10, 0))
@@ -328,10 +375,10 @@ sync_button = ttk.Button(tab2, text="Do All", command=lambda: run_async(do_all),
 sync_button.pack(fill=tk.X, pady=5)
 
 # STATUS
-status_frame = ttk.Frame(root, padding=5)
+status_frame = ttk.Frame(root)
 status_frame.pack(side=tk.BOTTOM, fill=tk.X)
 status_var = tk.StringVar(value="READY")
-status_label = ttk.Label(status_frame, textvariable=status_var, relief="sunken", anchor="center")
-status_label.pack(fill=tk.X)
+status_label = ttk.Label(status_frame, textvariable=status_var, style="Status.TLabel", anchor="center")
+status_label.pack(fill=tk.X, padx=10, pady=(0, 10))
 
 root.mainloop()
