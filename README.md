@@ -35,6 +35,6 @@ It is perfect for users who just want to get their code pushed without the wait.
    py -m PyInstaller --noconfirm QuikBash.spec
 
 ### For Users
-1. Download the latest version of QuikBash.exe from the Releases page.
+1. Download the latest version of QuikBash.exe from the [Releases](https://github.com/kriscow/quikbash-tool/releases) page.
 2. Ensure you have [Git](https://git-scm.com/downloads) installed on your system.
 3. Simply run QuikBash.exe.
