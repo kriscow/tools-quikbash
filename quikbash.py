@@ -316,7 +316,7 @@ style.map("TButton", background=[("active", orange), ("disabled", "#D0D0D0")], f
 
 # Tabs
 style.configure("TNotebook", background=white, borderwidth=0)
-style.configure("TNotebook.Tab", background="#F0F0F0", foreground=dark, padding=[20, 8]) # Increased horizontal padding
+style.configure("TNotebook.Tab", background="#F0F0F0", foreground=dark, padding=[20, 8])
 style.map("TNotebook.Tab", background=[("selected", orange)], foreground=[("selected", white)], padding=[("selected", [20, 8])]) # Crucial: Force same padding when selected
 
 # Entries, Comboboxes
