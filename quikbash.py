@@ -293,7 +293,7 @@ def add_placeholder(entry, placeholder):
 
 # Base
 root = tk.Tk()
-root.title("QuikBash Beta 1.1")
+root.title("QuikBash Beta 1.2")
 root.geometry("500x450")
 
 # Theme
@@ -304,7 +304,7 @@ style.theme_use('clam')
 orange = "#FF7F11"
 dark = "#262626"
 white = "#FFFFFF"
-lime = "#ACBFA4"
+green = "#2F6B3F"
 
 # Base Style
 root.configure(background=white)
@@ -317,7 +317,7 @@ style.map("TButton", background=[("active", orange), ("disabled", "#D0D0D0")], f
 # Tabs
 style.configure("TNotebook", background=white, borderwidth=0)
 style.configure("TNotebook.Tab", background="#F0F0F0", foreground=dark, padding=[20, 8])
-style.map("TNotebook.Tab", background=[("selected", orange)], foreground=[("selected", white)], padding=[("selected", [20, 8])]) # Crucial: Force same padding when selected
+style.map("TNotebook.Tab", background=[("selected", orange)], foreground=[("selected", white)], padding=[("selected", [20, 8])])
 
 # Entries, Comboboxes
 style.configure("TEntry", fieldbackground=white, bordercolor=dark, lightcolor=dark)
@@ -326,7 +326,7 @@ style.map("TEntry", fieldbackground=[("focus", white)], selectbackground=[("!dis
 style.map("TCombobox", fieldbackground=[("focus", white)], selectbackground=[("!disabled", dark)], selectforeground=[("!disabled", white)])
 
 # Status Text
-style.configure("Status.TLabel", background=lime, foreground=dark, padding=10)
+style.configure("Status.TLabel", background=white, foreground=green, padding=10)
 
 # Entry Vars
 folder_var = tk.StringVar()
@@ -387,7 +387,7 @@ sync_button.pack(fill=tk.X, pady=5)
 status_frame = ttk.Frame(root)
 status_frame.pack(side=tk.BOTTOM, fill=tk.X)
 status_var = tk.StringVar(value="READY")
-status_label = ttk.Label(status_frame, textvariable=status_var, style="Status.TLabel", anchor="center")
-status_label.pack(fill=tk.X, padx=10, pady=(0, 10))
+status_label = ttk.Label(status_frame, textvariable=status_var, style="Status.TLabel", anchor="center", font=('Arial', 9, 'bold'))
+status_label.pack(fill=tk.X, padx=10, pady=(0, 3))
 
 root.mainloop()
