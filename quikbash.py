@@ -326,7 +326,7 @@ style.map("TEntry", fieldbackground=[("focus", white)], selectbackground=[("!dis
 style.map("TCombobox", fieldbackground=[("focus", white)], selectbackground=[("!disabled", dark)], selectforeground=[("!disabled", white)])
 
 # Status Text
-style.configure("Status.TLabel", background=white, foreground=green, padding=10)
+style.configure("Status.TLabel", background=white, foreground=dark, padding=10)
 
 # Entry Vars
 folder_var = tk.StringVar()
