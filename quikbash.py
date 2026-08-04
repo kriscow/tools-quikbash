@@ -1,539 +1,629 @@
-import tkinter as tk  # GUI
-from tkinter import messagebox, ttk  # GUI submodules
-import os  # py <> file system communication
-import subprocess  # py <> CLI communication
-import threading  # freeze prevention
+from nicegui import ui
+import os
+import subprocess
+import webbrowser
+import time
 
-h_file = "qb_history.txt"
-startup_flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+HISTORY_FILE = "qb_history.txt"
+STARTUP_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+MAX_HISTORY = 5
+
+primary = "#ff7f11"
+light = "#ffffff"
+dark = "#262626"
+success = "#00f48e"
+warning = "#ff0f39"
+
+# ======================================================================================================================
+# STATE MANAGEMENT =====================================================================================================
+# ======================================================================================================================
+
+class Main:
+    def __init__(self):
+        # input
+        self.folder = ""
+        self.url = ""
+        self.branch = "main"
+        self.commit_msg = ""
+        self.history = []
+        self.status_text = "READY"
+        # controls
+        self.status_label = None
+        self.init_button = None
+        self.commit_button = None
+        self.push_button = None
+        self.sync_button = None
+        self.pull_button = None
+        self.folder_input = None
+        # history
+        self.load_history()
+
+    def load_history(self):
+        """Load saved repository paths"""
+        if os.path.exists(HISTORY_FILE):
+            try:
+                with open(HISTORY_FILE, 'r') as f:
+                    self.history = [line.strip() for line in f.readlines() if line.strip()]
+            except Exception:
+                self.history = []
+        return self.history
+
+    def save_history(self, path):
+        """Save a new repository path"""
+        if path in self.history:
+            self.history.remove(path)
+        self.history.insert(0, path)
+        self.history = self.history[:MAX_HISTORY]
+
+        with open(HISTORY_FILE, 'w') as f:
+            f.write('\n'.join(self.history))
+
+# Create a single state instance
+app_state = Main()
 
 # ======================================================================================================================
 # VALIDATION ===========================================================================================================
 # ======================================================================================================================
 
-def validate_fields(*args):
-    """Disable buttons if at least one required entry is empty."""
-    if folder_var.get().strip() and url_var.get().strip():
-        init_button.config(state="normal")
-    else:
-        init_button.config(state="disabled")
+def validate_fields():
+    """Enable/disable buttons based on input"""
+    # For init button
+    if app_state.init_button:
+        if app_state.folder and app_state.url:
+            app_state.init_button.enable()
+        else:
+            app_state.init_button.disable()
 
-    if folder_var.get().strip() and msg_var.get().strip():
-        anc_button.config(state="normal")
-        push_button.config(state="normal")
-        sync_button.config(state="normal")
-    else:
-        anc_button.config(state="disabled")
-        push_button.config(state="disabled")
-        sync_button.config(state="disabled")
+    # For repo commands
+    can_operate = bool(app_state.folder and app_state.commit_msg)
+    if app_state.commit_button:
+        if can_operate:
+            app_state.commit_button.enable()
+        else:
+            app_state.commit_button.disable()
+    if app_state.push_button:
+        if can_operate:
+            app_state.push_button.enable()
+        else:
+            app_state.push_button.disable()
+    if app_state.sync_button:
+        if can_operate:
+            app_state.sync_button.enable()
+        else:
+            app_state.sync_button.disable()
 
-    if folder_var.get().strip():
-        pull_button.config(state="normal")
-    else:
-        pull_button.config(state="disabled")
+    # Pull only needs a folder
+    if app_state.pull_button:
+        if app_state.folder:
+            app_state.pull_button.enable()
+        else:
+            app_state.pull_button.disable()
 
-# ======================================================================================================================
 def validate_environment(folder_name, check_git=True):
-    """Verifies the existence of the target path (though optional) and confirms if it is Git-ready."""
+    """Verify if folder exists and if a Git repo"""
     if not os.path.isdir(folder_name):
-        messagebox.showerror("Error", f"Path '{folder_name}' is not a valid directory.")
+        ui.notify(f"❌ Path '{folder_name}' is not a valid directory.", type='negative')
         return False
+
     if check_git:
-        result = subprocess.run(['git', '-C', folder_name, 'rev-parse', '--is-inside-work-tree'],
-                                capture_output=True, text=True, creationflags=startup_flags)
+        result = subprocess.run(
+            ['git', '-C', folder_name, 'rev-parse', '--is-inside-work-tree'],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
         if result.returncode != 0:
-            messagebox.showerror("Error", "Not a Git repository. Initialize it first.")
+            ui.notify("❌ Not a Git repository. Initialize it first.", type='negative')
             return False
     return True
+
+def set_status(text):
+    """Update status text with color coding"""
+    app_state.status_text = text
+    if app_state.status_label:
+        # Determine color based on status
+        if "✅" in text or "SUCCESS" in text or "COMPLETED" in text:
+            css_class = "status-success"
+        elif "❌" in text or "ERROR" in text or "FAILED" in text:
+            css_class = "status-warning"
+        else:
+            css_class = "status-neutral"
+
+        app_state.status_label.classes(remove='status-neutral status-success status-warning')
+        app_state.status_label.classes(css_class)
+        app_state.status_label.set_text(f"Status: {text}")
 
 # ======================================================================================================================
 # COMMANDS =============================================================================================================
 # ======================================================================================================================
 
 def init_new_repo():
-    """Merge all Git initialization commands into one button."""
-    folder = folder_entry.get().strip()
-    url = url_entry.get().strip()
+    """Initialize a new Git repository and push to GitHub"""
+    folder = app_state.folder
+    url = app_state.url
 
-    update_btns("disabled")
-    update_sts(init_button.config, text="Processing...")
+    if not folder or not url:
+        ui.notify("⚠️ Please enter both folder path and GitHub URL!", type='warning')
+        return
+    set_status("Processing...")
 
     try:
-        if not folder or not url:
-            update_sts(messagebox.showwarning, title="Input", message="Please enter both folder path and GitHub URL!")
-            return
-
-        # Check if it's already a git repo
-        is_git_repo = subprocess.run(['git', '-C', folder, 'rev-parse', '--is-inside-work-tree'],
-                                     capture_output=True, text=True, creationflags=startup_flags)
-
-        # Only run init if not a git repo
-        if is_git_repo.returncode != 0:
-            result = subprocess.run(['git', '-C', folder, 'init'], capture_output=True, text=True,
-                                    creationflags=startup_flags)
+        # Check if already a git repo
+        is_git = subprocess.run(
+            ['git', '-C', folder, 'rev-parse', '--is-inside-work-tree'],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
+        # Init if not a git repo
+        if is_git.returncode != 0:
+            result = subprocess.run(
+                ['git', '-C', folder, 'init'],
+                capture_output=True, text=True, creationflags=STARTUP_FLAGS
+            )
             if result.returncode != 0:
-                update_sts(messagebox.showerror, title="Git Error", message=f"Failed to init: {result.stderr}")
+                ui.notify(f"❌ Failed to init: {result.stderr}", type='negative')
                 return
 
         # Add all files
-        result = subprocess.run(['git', '-C', folder, 'add', '.'], capture_output=True, text=True,
-                                creationflags=startup_flags)
+        result = subprocess.run(
+            ['git', '-C', folder, 'add', '.'],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
         if result.returncode != 0:
-            update_sts(messagebox.showerror, title="Git Error", message=f"Failed to add: {result.stderr}")
+            ui.notify(f"❌ Failed to add: {result.stderr}", type='negative')
             return
 
         # Check if there are changes to commit
-        status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'],
-                                capture_output=True, text=True, creationflags=startup_flags)
+        status = subprocess.run(
+            ['git', '-C', folder, 'status', '--porcelain'],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
 
-        # Only commit if there are changes
         if status.stdout.strip():
-            result = subprocess.run(['git', '-C', folder, 'commit', '-m', 'Initial commit'],
-                                    capture_output=True, text=True, creationflags=startup_flags)
+            result = subprocess.run(
+                ['git', '-C', folder, 'commit', '-m', 'Initial commit'],
+                capture_output=True, text=True, creationflags=STARTUP_FLAGS
+            )
             if result.returncode != 0:
-                update_sts(messagebox.showerror, title="Git Error", message=f"Failed at commit: {result.stderr}")
+                ui.notify(f"❌ Failed at commit: {result.stderr}", type='negative')
                 return
         else:
             set_status("NO CHANGES TO COMMIT")
 
-        # Set branch to main
-        result = subprocess.run(['git', '-C', folder, 'branch', '-M', 'main'],
-                                capture_output=True, text=True, creationflags=startup_flags)
+        # Default to main
+        result = subprocess.run(
+            ['git', '-C', folder, 'branch', '-M', 'main'],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
         if result.returncode != 0:
-            update_sts(messagebox.showerror, title="Git Error", message=f"Failed to set branch: {result.stderr}")
+            ui.notify(f"❌ Failed to set branch: {result.stderr}", type='negative')
             return
 
         # Check if remote already exists
-        remote_check = subprocess.run(['git', '-C', folder, 'remote', 'get-url', 'origin'],
-                                      capture_output=True, text=True, creationflags=startup_flags)
+        remote_check = subprocess.run(
+            ['git', '-C', folder, 'remote', 'get-url', 'origin'],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
 
         if remote_check.returncode != 0:
-            # Add remote if it does not exist
-            result = subprocess.run(['git', '-C', folder, 'remote', 'add', 'origin', url],
-                                    capture_output=True, text=True, creationflags=startup_flags)
+            result = subprocess.run(
+                ['git', '-C', folder, 'remote', 'add', 'origin', url],
+                capture_output=True, text=True, creationflags=STARTUP_FLAGS
+            )
             if result.returncode != 0:
-                update_sts(messagebox.showerror, title="Git Error", message=f"Failed to add remote: {result.stderr}")
+                ui.notify(f"❌ Failed to add remote: {result.stderr}", type='negative')
                 return
         else:
-            # Update remote URL if it exists
-            result = subprocess.run(['git', '-C', folder, 'remote', 'set-url', 'origin', url],
-                                    capture_output=True, text=True, creationflags=startup_flags)
+            result = subprocess.run(
+                ['git', '-C', folder, 'remote', 'set-url', 'origin', url],
+                capture_output=True, text=True, creationflags=STARTUP_FLAGS
+            )
             if result.returncode != 0:
-                update_sts(messagebox.showerror, title="Git Error", message=f"Failed to update remote: {result.stderr}")
+                ui.notify(f"❌ Failed to update remote: {result.stderr}", type='negative')
                 return
 
-        # Check if remote has content (for fresh repo)
+        # Check if remote has content
         set_status("CHECKING REMOTE...")
-        remote_check = subprocess.run(['git', '-C', folder, 'ls-remote', 'origin', 'main'],
-                                      capture_output=True, text=True, creationflags=startup_flags)
+        remote_check = subprocess.run(
+            ['git', '-C', folder, 'ls-remote', 'origin', 'main'],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
 
-        # Only try to pull if remote has content
+        # Only pull if remote has content
         if remote_check.stdout.strip():
             set_status("REMOTE HAS CONTENT - PULLING...")
-            pull_result = subprocess.run(['git', '-C', folder, 'pull', 'origin', 'main', '--allow-unrelated-histories'],
-                                         capture_output=True, text=True, creationflags=startup_flags)
+            pull_result = subprocess.run(
+                ['git', '-C', folder, 'pull', 'origin', 'main', '--allow-unrelated-histories'],
+                capture_output=True, text=True, creationflags=STARTUP_FLAGS
+            )
             if pull_result.returncode != 0:
-                update_sts(messagebox.showwarning, title="Pull Warning",
-                           message=f"Pull had issues, trying to continue...\n{pull_result.stderr}")
+                ui.notify(f"⚠️ Pull had issues: {pull_result.stderr}", type='warning')
         else:
             set_status("REMOTE IS EMPTY - READY TO PUSH")
 
-        # Push to GitHub
+        # Push
         set_status("PUSHING TO GITHUB...")
-        result = subprocess.run(['git', '-C', folder, 'push', '-u', 'origin', 'main'],
-                                capture_output=True, text=True, creationflags=startup_flags)
+        result = subprocess.run(
+            ['git', '-C', folder, 'push', '-u', 'origin', 'main'],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
         if result.returncode != 0:
-            update_sts(messagebox.showerror, title="Git Error", message=f"Failed at push: {result.stderr}")
+            ui.notify(f"❌ Failed at push: {result.stderr}", type='negative')
             return
 
-        save_history(folder)
-        set_status("CONNECTED TO GITHUB")
+        app_state.save_history(folder)
+        set_status("✅ CONNECTED TO GITHUB")
+        ui.notify("✅ Repository successfully initialized and pushed!", type='positive')
 
-    finally:
-        update_btns("normal")
-        validate_fields()
-        update_sts(init_button.config, text="Initialize & Push")
+    except Exception as e:
+        ui.notify(f"❌ Error: {str(e)}", type='negative')
+    validate_fields()
 
-# ======================================================================================================================
-def do_all():
-    """Merge all Git repository update commands into one button."""
-    folder = folder_entry.get().strip()
-    branch = branch_var.get().strip()
-    msg = commit_entry.get().strip()
-
-    update_btns("disabled")
-    update_sts(sync_button.config, text="Processing...")
-
-    try:
-        if not folder or not msg:
-            update_sts(messagebox.showwarning, title="Input", message="Please fill up all entry fields.")
-            return
-
-        if not branch:
-            branch = "main"
-            branch_var.set("main")
-
-        # Do not commit if changes need to be pulled first
-        set_status("PREPARING TO COMMIT...")
-        fetch_result = subprocess.run(['git', '-C', folder, 'fetch', 'origin', branch], capture_output=True, text=True, creationflags=startup_flags)
-        if fetch_result.returncode != 0: pass
-        behind_check = subprocess.run(['git', '-C', folder, 'rev-list', '--count', f'HEAD..origin/{branch}'], capture_output=True, text=True, creationflags=startup_flags)
-
-        if behind_check.stdout.strip() and int(behind_check.stdout.strip()) > 0:
-            response = messagebox.askyesno(
-                "Remote Has New Changes",
-                "Remote has new commits that you don't have locally.\n\n"
-                "Do you want to pull them first before committing?"
-            )
-            if response:
-                pull_result = subprocess.run(['git', '-C', folder, 'pull', 'origin', branch], capture_output=True, text=True, creationflags=startup_flags)
-                if pull_result.returncode != 0:
-                    update_sts(messagebox.showerror, title="Pull Failed", message=f"Pull failed:\n{pull_result.stderr}")
-                    return
-                set_status("PULL COMPLETED")
-
-        checkout_res = subprocess.run(['git', '-C', folder, 'checkout', branch],
-                                      capture_output=True, text=True, creationflags=startup_flags)
-        if checkout_res.returncode != 0:
-            create_res = subprocess.run(['git', '-C', folder, 'checkout', '-b', branch],
-                                        capture_output=True, text=True, creationflags=startup_flags)
-            if create_res.returncode != 0:
-                update_sts(messagebox.showerror, title="Git Error",
-                           message=f"Could not create to branch '{branch}':\n{checkout_res.stderr}")
-                return
-            else:
-                set_status(f"CREATED % SWITCHED TO BRANCH: {branch}")
-        else:
-            set_status(f"SWITCHED TO BRANCH: {branch}")
-
-        status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'],
-                                capture_output=True, text=True, creationflags=startup_flags)
-        if not status.stdout.strip():
-            update_sts(messagebox.showinfo, title="Status", message="No changes detected.")
-            return
-
-        commands = [
-            ['git', '-C', folder, 'add', '-A'],
-            ['git', '-C', folder, 'commit', '-m', msg],
-            ['git', '-C', folder, 'push', '-u', 'origin', branch]
-        ]
-
-        for cmd in commands:
-            result = subprocess.run(cmd, capture_output=True, text=True, creationflags=startup_flags)
-            if result.returncode != 0:
-                update_sts(messagebox.showerror, title="Git Error",
-                           message=f"Failed at: {' '.join(cmd)}\n{result.stderr}")
-                return
-
-        save_history(folder)
-        set_status("REPOSITORY UPDATED")
-
-    finally:
-        update_btns("normal")
-        validate_fields()
-        update_sts(sync_button.config, text="Do All")
-
-# ======================================================================================================================
 def commit_changes():
-    """Merge 'Add all' and 'Commit' into one button."""
-    folder = folder_entry.get().strip()
-    msg = commit_entry.get().strip()
+    """Commit all changes"""
+    folder = app_state.folder
+    msg = app_state.commit_msg
 
-    update_btns("disabled")
-    update_sts(anc_button.config, text="Processing...")
+    if not msg:
+        ui.notify("⚠️ Please enter a commit message!", type='warning')
+        return
+    if not validate_environment(folder):
+        return
 
-    try:
-        if not msg:
-            update_sts(messagebox.showwarning, title="Input", message="Please enter a commit message!")
-            return
+    set_status("Checking for changes...")
 
-        if not validate_environment(folder): return
+    # Check if there are changes
+    status = subprocess.run(
+        ['git', '-C', folder, 'status', '--porcelain'],
+        capture_output=True, text=True, creationflags=STARTUP_FLAGS
+    )
 
-        status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'],
-                                capture_output=True, text=True, creationflags=startup_flags)
+    if not status.stdout.strip():
+        ui.notify("ℹ️ No changes detected. Git doesn't track empty folders.", type='info')
+        set_status("NO CHANGES")
+        return
+    set_status("Adding and committing...")
 
-        if not status.stdout.strip():
-            update_sts(messagebox.showinfo, title="Status", message="No changes detected.\n\nTip: Git doesn't track empty folders. Add a file to the folder first.")
-            return
+    # Add and commit
+    subprocess.run(['git', '-C', folder, 'add', '-A'], creationflags=STARTUP_FLAGS)
+    result = subprocess.run(
+        ['git', '-C', folder, 'commit', '-m', msg],
+        capture_output=True, text=True, creationflags=STARTUP_FLAGS
+    )
 
-        subprocess.run(['git', '-C', folder, 'add', '-A'], creationflags=startup_flags)
-        result = subprocess.run(['git', '-C', folder, 'commit', '-m', msg],
-                                capture_output=True, text=True, creationflags=startup_flags)
+    if result.returncode == 0:
+        app_state.save_history(folder)
+        set_status("✅ READY TO PUSH")
+        ui.notify("✅ Commit successful!", type='positive')
+    else:
+        ui.notify(f"❌ Commit failed: {result.stderr}", type='negative')
 
-        if result.returncode == 0:
-            set_status("READY TO PUSH")
-        else:
-            update_sts(messagebox.showerror, title="Git Error", message=result.stderr)
+    validate_fields()
 
-    finally:
-        update_btns("normal")
-        validate_fields()
-        update_sts(anc_button.config, text="Add & Commit")
-
-# ======================================================================================================================
 def push_to_github():
-    """Finally push commitments to the connected GitHub repository."""
-    folder = folder_entry.get().strip()
-    branch = branch_var.get().strip()
+    """Push to GitHub"""
+    folder = app_state.folder
+    branch = app_state.branch or "main"
 
-    update_btns("disabled")
-    update_sts(push_button.config, text="Processing...")
+    if not validate_environment(folder): return
 
-    try:
-        if not validate_environment(folder): return
+    set_status(f"Checking {branch}...")
 
-        if not branch:
-            branch = "main"
-            branch_var.set("main")
-
-        # Do not push if changes need to be pulled first
-        set_status("CHECKING REMOTE STATUS...")
-
-        checkout_res = subprocess.run(['git', '-C', folder, 'checkout', branch],
-                                      capture_output=True, text=True, creationflags=startup_flags)
-        if checkout_res.returncode != 0:
-            create_res = subprocess.run(['git', '-C', folder, 'checkout', '-b', branch],
-                                        capture_output=True, text=True, creationflags=startup_flags)
-            if create_res.returncode != 0:
-                update_sts(messagebox.showerror, title="Git Error",
-                           message=f"Could not create to branch '{branch}':\n{checkout_res.stderr}")
-                return
-            else:
-                set_status(f"CREATED % SWITCHED TO BRANCH: {branch}")
-        else:
-            set_status(f"SWITCHED TO BRANCH: {branch}")
-
-        # Do not push if changes are uncommitted
-        status = subprocess.run(['git', '-C', folder, 'status', '--porcelain'],
-                                capture_output=True, text=True, creationflags=startup_flags)
-        if status.stdout.strip():
-            update_sts(messagebox.showerror, title="Push Blocked",
-                       message="Uncommitted changes detected! Please commit them first.")
+    # Ensure we're on the right branch
+    checkout_res = subprocess.run(
+        ['git', '-C', folder, 'checkout', branch],
+        capture_output=True, text=True, creationflags=STARTUP_FLAGS
+    )
+    if checkout_res.returncode != 0:
+        # Create branch if it doesn't exist
+        create_res = subprocess.run(
+            ['git', '-C', folder, 'checkout', '-b', branch],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
+        if create_res.returncode != 0:
+            ui.notify(f"❌ Could not switch to branch '{branch}': {checkout_res.stderr}", type='negative')
             return
-
-        # Do not push if version is up to date
-        check_push = subprocess.run(['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
-                                    capture_output=True, text=True, creationflags=startup_flags)
-        if not check_push.stdout.strip():
-            update_sts(messagebox.showinfo, title="Push Status", message="Everything is already up to date!")
-            return
-
-        # Push if previous checks are not met
-        set_status("PUSHING TO GITHUB...")
-        result = subprocess.run(['git', '-C', folder, 'push', '-u', 'origin', branch], capture_output=True, text=True, creationflags=startup_flags)
-
-        if result.returncode == 0:
-            save_history(folder)
-            set_status("REPOSITORY UPDATED")
         else:
-            if "rejected" in result.stderr.lower() and "fetch first" in result.stderr.lower():
-                update_sts(messagebox.showerror, title="Push Failed",
-                           message="Remote has new commits!\n\nClick 'Pull Latest' first to get them, then try pushing again.")
-            else:
-                update_sts(messagebox.showerror, title="Push Failed", message=result.stderr)
+            set_status(f"✅ CREATED & SWITCHED TO BRANCH: {branch}")
+    else:
+        set_status(f"✅ SWITCHED TO BRANCH: {branch}")
 
-    finally:
-        update_btns("normal")
-        validate_fields()
-        update_sts(push_button.config, text="Push to GitHub")
+    # Check for uncommitted changes
+    status = subprocess.run(
+        ['git', '-C', folder, 'status', '--porcelain'],
+        capture_output=True, text=True, creationflags=STARTUP_FLAGS
+    )
+    if status.stdout.strip():
+        ui.notify("⚠️ Uncommitted changes detected! Commit them first.", type='warning')
+        return
 
-# ======================================================================================================================
+    # Check if needs pushing
+    check_push = subprocess.run(
+        ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
+        capture_output=True, text=True, creationflags=STARTUP_FLAGS
+    )
+    if not check_push.stdout.strip():
+        ui.notify("ℹ️ Everything is already up to date!", type='info')
+        return
+
+    set_status("PUSHING TO GITHUB...")
+    result = subprocess.run(
+        ['git', '-C', folder, 'push', '-u', 'origin', branch],
+        capture_output=True, text=True, creationflags=STARTUP_FLAGS
+    )
+
+    if result.returncode == 0:
+        app_state.save_history(folder)
+        set_status("✅ REPOSITORY UPDATED")
+        ui.notify("✅ Push successful!", type='positive')
+    else:
+        if "rejected" in result.stderr.lower():
+            ui.notify("⚠️ Remote has new commits! Pull first, then push.", type='warning')
+        else:
+            ui.notify(f"❌ Push failed: {result.stderr}", type='negative')
+    validate_fields()
+
 def pull_from_github():
-    """Pull to get latest changes from remote."""
-    folder = folder_entry.get().strip()
-    branch = branch_var.get().strip() or "main"
+    """Pull latest changes from GitHub"""
+    folder = app_state.folder
+    branch = app_state.branch or "main"
 
-    update_btns("disabled")
-    update_sts(pull_button.config, text="Pulling...")
+    if not folder:
+        ui.notify("⚠️ Please enter a folder path!", type='warning')
+        return
+    if not validate_environment(folder):
+        return
 
-    try:
-        if not folder:
-            update_sts(messagebox.showwarning, title="Input", message="Please enter a folder path!")
-            return
+    set_status(f"PULLING FROM {branch}...")
 
-        if not validate_environment(folder): return
+    # Pull
+    result = subprocess.run(
+        ['git', '-C', folder, 'pull', 'origin', branch],
+        capture_output=True, text=True, creationflags=STARTUP_FLAGS
+    )
 
-        set_status(f"PULLING FROM {branch}...")
-        result = subprocess.run(['git', '-C', folder, 'pull', 'origin', branch],
-                                capture_output=True, text=True, creationflags=startup_flags)
-
-        if result.returncode == 0:
-            save_history(folder)
-            set_status("PULL SUCCESSFUL")
-            messagebox.showinfo("Success", f"Latest changes pulled successfully from '{branch}'!")
+    if result.returncode == 0:
+        app_state.save_history(folder)
+        set_status("✅ PULL SUCCESSFUL")
+        ui.notify(f"✅ Successfully pulled from '{branch}'!", type='positive')
+    else:
+        if "no such remote" in result.stderr.lower():
+            ui.notify("⚠️ No remote 'origin' found. Initialize the repo first.", type='warning')
         else:
-            if "no such remote" in result.stderr.lower():
-                update_sts(messagebox.showerror, title="Pull Failed",
-                           message="No remote 'origin' found. Initialize the repo first with 'New Repo' tab.")
-            else:
-                update_sts(messagebox.showerror, title="Pull Failed",
-                           message=f"Pull failed:\n{result.stderr}")
+            ui.notify(f"❌ Pull failed: {result.stderr}", type='negative')
+    validate_fields()
 
-    finally:
-        update_btns("normal")
+def do_all():
+    """Commit and push in one action"""
+    folder = app_state.folder
+    msg = app_state.commit_msg
+
+    if not folder or not msg:
+        ui.notify("⚠️ Please enter both folder path and commit message!", type='warning')
+        return
+
+    # Commit
+    set_status("Committing changes...")
+    commit_changes()
+
+    # Push
+    if app_state.status_text != "NO CHANGES" and app_state.status_text != "READY TO PUSH":
+        set_status("Pushing to GitHub...")
+        push_to_github()
+
+def set_folder(path):
+    """Set folder from history chip"""
+    app_state.folder = path
+    if app_state.folder_input:
+        app_state.folder_input.value = path
+    app_state.save_history(path)
+    validate_fields()
+
+def update_folder(path):
+    """Update folder and trigger validation"""
+    if path and path != app_state.folder:
+        app_state.folder = path
+        app_state.save_history(path)
         validate_fields()
-        update_sts(pull_button.config, text="Pull Latest")
 
-# ======================================================================================================================
-# HISTORY ==============================================================================================================
-# ======================================================================================================================
-
-def load_history():
-    """Load the (5) most recently initialized/updated repositories."""
-    if os.path.exists(h_file):
-        try:
-            with open(h_file, 'r') as f:
-                return [line.strip() for line in f.readlines() if line.strip()]
-        except Exception:
-            return []
-    return []
-
-# ======================================================================================================================
-def save_history(path):
-    """If path is new, save it."""
-    history = load_history()
-
-    if path in history:
-        history.remove(path)
-    history.insert(0, path)
-    history = history[:5]
-
-    with open(h_file, 'w') as f:
-        f.write('\n'.join(history))
-    folder_entry['values'] = history
-
-# ======================================================================================================================
-# HELPERS ==============================================================================================================
-# ======================================================================================================================
-
-# Threading
-def run_async(func):
-    threading.Thread(target=func, daemon=True).start()
-
-# Process State (messagebox & button text)
-def update_sts(func, **kwargs):
-    root.after(0, lambda: func(**kwargs))
-
-# Button State (en/disabled)
-def update_btns(state):
-    buttons = [init_button, anc_button, push_button, sync_button, pull_button]
-    for btn in buttons:
-        update_sts(btn.config, state=state)
-
-# Status Text
-def set_status(text):
-    update_sts(status_var.set, value=text)
-
-# Branch Entry Placeholder
-def add_placeholder(entry, placeholder):
-    branch_var.set(placeholder)
 
 # ======================================================================================================================
 # INTERFACE ============================================================================================================
 # ======================================================================================================================
 
-# Base
-root = tk.Tk()
-root.title("QuikBash Beta 1.5")
-root.geometry("425x425")
+@ui.page('/')
+def main_page():
+    ui.page_title("QuikBash")
+    ui.add_head_html(f'''
+        <style>
+            /* Global styles */
+            body {{ background: {light}; color: {dark}; }}
+            .q-field__label {{ color: {dark} !important; font-weight: bold; }}
+            .q-field__control {{ border-color: {dark} !important; }}
+            .nicegui-button,
+            .q-btn,
+            button.nicegui-button,
+            .q-btn.nicegui-button {{
+                border-radius: 4px !important;
+                transition: all 0.2s ease !important;
+                opacity: 0.4 !important;
+                background: {dark} !important;
+                color: {light} !important;
+                border: none !important;
+            }}
 
-# Theme
-style = ttk.Style()
-style.theme_use('clam')
+            .nicegui-button:enabled,
+            .q-btn:enabled,
+            button.nicegui-button:enabled,
+            .q-btn.nicegui-button:enabled {{
+                opacity: 1 !important;
+            }}
 
-# Palette
-orange = "#FF7F11"
-dark = "#262626"
-white = "#FFFFFF"
-green = "#2F6B3F"
+            .nicegui-button:enabled:hover,
+            .q-btn:enabled:hover,
+            button.nicegui-button:enabled:hover,
+            .q-btn.nicegui-button:enabled:hover {{
+                background: {primary} !important;
+                color: {light} !important;
+            }}
 
-# Base Style
-root.configure(background=white)
-style.configure(".", background=white, foreground=dark, fieldbackground=white)
+            .nicegui-button:enabled:active,
+            .q-btn:enabled:active,
+            button.nicegui-button:enabled:active,
+            .q-btn.nicegui-button:enabled:active {{
+                background: {light} !important;
+                color: {dark} !important;
+                border: 1px solid {dark} !important;
+            }}
 
-# Buttons
-style.configure("TButton", background=dark, foreground=white, borderwidth=0, padding=6)
-style.map("TButton", background=[("active", orange), ("disabled", "#D0D0D0")], foreground=[("active", white), ("disabled", "#888888")])
+            /* Disabled state */
+            .nicegui-button:disabled,
+            .q-btn:disabled,
+            button.nicegui-button:disabled,
+            .q-btn.nicegui-button:disabled {{
+                opacity: 0.4 !important;
+                background: {dark} !important;
+                color: {light} !important;
+            }}
 
-# Tabs
-style.configure("TNotebook", background=white, borderwidth=0)
-style.configure("TNotebook.Tab", background="#F0F0F0", foreground=dark, padding=[20, 8])
-style.map("TNotebook.Tab", background=[("selected", orange)], foreground=[("selected", white)], padding=[("selected", [20, 8])])
+            /* Status bar */
+            .status-bar {{
+                background: {light};
+                padding: 12px;
+                border-top: 2px solid {dark};
+                font-family: monospace;
+                font-weight: bold;
+                margin: 0;
+            }}
+            .status-neutral {{ color: {dark}; }}
+            .status-success {{ color: {success}; }}
+            .status-warning {{ color: {warning}; }}
 
-# Entries, Comboboxes
-style.configure("TEntry", fieldbackground=white, bordercolor=dark, lightcolor=dark)
-style.configure("TCombobox", fieldbackground=white, bordercolor=dark)
-style.map("TEntry", fieldbackground=[("focus", white)], selectbackground=[("!disabled", dark)], selectforeground=[("!disabled", white)])
-style.map("TCombobox", fieldbackground=[("focus", white)], selectbackground=[("!disabled", dark)], selectforeground=[("!disabled", white)])
+            /* Main container */
+            .main-container {{ max-width: 800px; margin: 0 auto; }}
 
-# Status Text
-style.configure("Status.TLabel", background=white, foreground=dark, padding=10)
+            /* Remove gap between cards and status */
+            .no-gap {{
+                gap: 0 !important;
+            }}
+            .gap-none {{
+                gap: 0 !important;
+            }}
+        </style>
+    ''')
 
-# Entry Vars
-folder_var = tk.StringVar()
-url_var = tk.StringVar()
-branch_var = tk.StringVar()
-msg_var = tk.StringVar()
+    # Header
+    with ui.column().classes('w-full main-container'):
+        with ui.row().classes('w-full items-center justify-between p-4'):
+            with ui.row().classes('items-center gap-3'):
+                ui.label('QuikBash').classes('text-h4 font-bold').style(f'color: {dark}')
+                ui.label('v3.0.gamma').classes('text-caption').style(f'color: {dark}')
 
-# Smart Enabling (see validate_fields)
-folder_var.trace_add("write", validate_fields)
-url_var.trace_add("write", validate_fields)
-msg_var.trace_add("write", validate_fields)
+    # Content
+    with ui.column().classes('w-full p-4 main-container gap-none'):
+        # Folder Path
+        with ui.card().classes('w-full mb-4'):
+            with ui.column().classes('w-full gap-2'):
+                app_state.folder_input = ui.input(
+                    label='Folder Path',
+                ).props('outlined').classes('w-full').bind_value_to(app_state, 'folder')
+                app_state.folder_input.on('change', lambda: update_folder(app_state.folder_input.value))
+                app_state.folder_input.on('keyup', lambda: validate_fields())
 
-# Folder Path UI
-ttk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(20, 0))
-folder_entry = ttk.Combobox(root, width=50, textvariable=folder_var)
-folder_entry.pack(pady=(5, 30), padx=20, fill=tk.X)
-folder_entry['values'] = load_history()
+                # History chips
+                if app_state.history:
+                    with ui.row().classes('gap-1 flex-wrap'):
+                        ui.label('Recent:').classes('text-caption').style(f'color: {dark}; opacity: 0.6')
+                        for path in app_state.history[:3]:
+                            ui.chip(
+                                os.path.basename(path) if os.path.basename(path) else path[:20],
+                                on_click=lambda p=path: set_folder(p),
+                                color=dark,
+                                text_color=dark
+                            ).props('outline dense')
 
-# Tab Control
-tab_control = ttk.Notebook(root)
-tab1 = ttk.Frame(tab_control, padding=10)
-tab2 = ttk.Frame(tab_control, padding=10)
-tab_control.add(tab1, text="New Repository")
-tab_control.add(tab2, text="Update Repository")
-tab_control.pack(expand=True, fill="both", padx=10)
+        # Tabs
+        with ui.tabs().classes('w-full') as tabs:
+            new_repo_tab = ui.tab('New Repository', icon='add_box')
+            update_tab = ui.tab('Update Repository', icon='sync')
 
-# Tab 1 (New Repo)
-ttk.Label(tab1, text="Remote URL:").pack(pady=(10, 0))
-url_entry = ttk.Entry(tab1, textvariable=url_var)
-url_entry.pack(pady=5, fill=tk.X)
+        with ui.tab_panels(tabs, value=new_repo_tab).classes('w-full'):
+            # Tab 1
+            with ui.tab_panel(new_repo_tab):
+                with ui.card().classes('w-full'):
+                    with ui.column().classes('w-full gap-4 p-4'):
+                        # Remote URL - consistent styling
+                        url_input = ui.input('Remote URL:') \
+                            .props('outlined') \
+                            .classes('w-full') \
+                            .bind_value_to(app_state, 'url')
+                        url_input.on('change', validate_fields)
+                        url_input.on('keyup', lambda: validate_fields())
 
-init_button = ttk.Button(tab1, text="INIT & PUSH", command=lambda: run_async(init_new_repo), state="disabled")
-init_button.pack(fill=tk.X, pady=5)
+                        # Init button
+                        app_state.init_button = ui.button(
+                            'Initialize & Push',
+                            on_click=init_new_repo
+                        ).props('color=dark text-white').classes('w-full')
+                        app_state.init_button.disable()
+            # Tab 2
+            with ui.tab_panel(update_tab):
+                with ui.card().classes('w-full'):
+                    with ui.column().classes('w-full gap-4 p-4'):
+                        # Branch - consistent styling
+                        branch_input = ui.input('Branch:') \
+                            .props('outlined') \
+                            .classes('w-full') \
+                            .bind_value_to(app_state, 'branch') \
+                            .props('placeholder=main')
 
-# Tab 2 (Update Repo)
-ttk.Label(tab2, text="Branch:").pack(pady=(10, 0))
-branch_entry = ttk.Entry(tab2, textvariable=branch_var)
-branch_entry.pack(pady=5, fill=tk.X)
-add_placeholder(branch_entry, "main")
+                        # Commit Message - consistent styling
+                        msg_input = ui.input('Commit Message:') \
+                            .props('outlined') \
+                            .classes('w-full') \
+                            .bind_value_to(app_state, 'commit_msg')
+                        msg_input.on('change', validate_fields)
+                        msg_input.on('keyup', lambda: validate_fields())
 
-ttk.Label(tab2, text="Message:").pack(pady=(10, 0))
-commit_entry = ttk.Entry(tab2, textvariable=msg_var)
-commit_entry.pack(pady=5, fill=tk.X)
+                        # Command buttons
+                        with ui.row().classes('w-full gap-2'):
+                            app_state.commit_button = ui.button(
+                                'Commit',
+                                on_click=commit_changes
+                            ).props('color=dark text-white').classes('flex-1')
+                            app_state.commit_button.disable()
 
-button_frame = ttk.Frame(tab2)
-button_frame.pack(pady=(20, 10), fill=tk.X)
-button_frame.columnconfigure(0, weight=1, uniform="a")
-button_frame.columnconfigure(1, weight=1, uniform="a")
+                            app_state.push_button = ui.button(
+                                'Push',
+                                on_click=push_to_github
+                            ).props('color=dark text-white').classes('flex-1')
+                            app_state.push_button.disable()
 
-anc_button = ttk.Button(button_frame, text="COMMIT", command=lambda: run_async(commit_changes), state="disabled")
-anc_button.grid(row=0, column=0, padx=(0, 5), pady=(0, 5), sticky="ew")
+                        with ui.row().classes('w-full gap-2'):
+                            app_state.sync_button = ui.button(
+                                'Commit & Push',
+                                on_click=do_all
+                            ).props('color=dark text-white').classes('flex-1')
+                            app_state.sync_button.disable()
 
-push_button = ttk.Button(button_frame, text="PUSH", command=lambda: run_async(push_to_github), state="disabled")
-push_button.grid(row=0, column=1, padx=(5, 0), pady=(0, 5), sticky="ew")
+                            app_state.pull_button = ui.button(
+                                'Pull',
+                                on_click=pull_from_github
+                            ).props('color=dark text-white').classes('flex-1')
+                            app_state.pull_button.disable()
+        # Status bar - directly attached, no card wrapper
+        with ui.column().classes('w-full status-bar'):
+            app_state.status_label = ui.label('Status: READY').classes('text-center status-neutral')
+    # Init validation state
+    validate_fields()
+    return
 
-sync_button = ttk.Button(button_frame, text="COMMIT & PUSH", command=lambda: run_async(do_all), state="disabled")
-sync_button.grid(row=1, column=0, padx=(0, 5), pady=(5, 0), sticky="ew")
+# ======================================================================================================================
+# START ================================================================================================================
+# ======================================================================================================================
 
-pull_button = ttk.Button(button_frame, text="PULL", command=lambda: run_async(pull_from_github), state="disabled")
-pull_button.grid(row=1, column=1, padx=(5, 0), pady=(5, 0), sticky="ew")
-
-# Status Text
-status_frame = ttk.Frame(root)
-status_frame.pack(side=tk.BOTTOM, fill=tk.X)
-status_var = tk.StringVar(value="READY")
-status_label = ttk.Label(status_frame, textvariable=status_var, style="Status.TLabel", anchor="center", font=('Arial', 9, 'bold'))
-status_label.pack(fill=tk.X, padx=10, pady=(0, 3))
-
-root.mainloop()
+if __name__ in {"__main__", "__mp_main__"}:
+    print("🟠 Starting QuikBash in browser...")
+    print("⚪ Server will be available at: http://127.0.0.1:8080")
+    ui.run(
+        host='127.0.0.1',
+        port=8080,
+        title='QuikBash'
+    )
