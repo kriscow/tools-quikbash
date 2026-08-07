@@ -35,6 +35,7 @@ class Main:
         self.sync_button = None
         self.pull_button = None
         self.folder_input = None
+        self.is_processing = False
         # history
         self.load_history()
 
@@ -115,8 +116,41 @@ def validate_environment(folder_name, check_git=True):
             return False
     return True
 
+def set_processing(active):
+    """Spinner & button management"""
+    app_state.is_processing = active
+
+    if app_state.spinner:
+        if active:
+            app_state.spinner.classes(remove='hidden')
+            app_state.spinner.classes('inline-block')
+        else:
+            app_state.spinner.classes(remove='inline-block')
+            app_state.spinner.classes('hidden')
+
+    # Disable/enable buttons
+    state = "disabled" if active else "enabled"
+    buttons = [
+        app_state.init_button,
+        app_state.commit_button,
+        app_state.push_button,
+        app_state.sync_button,
+        app_state.pull_button
+    ]
+
+    for btn in buttons:
+        if btn:
+            if active:
+                btn.disable()
+            else:
+                btn.enable()
+
+    # Apply field validation when idle
+    if not active:
+        validate_fields()
+
 def set_status(text):
-    """Update status text with color coding"""
+    """Update status"""
     app_state.status_text = text
     if app_state.status_label:
         # Determine color based on status
@@ -129,7 +163,7 @@ def set_status(text):
 
         app_state.status_label.classes(remove='status-neutral status-success status-warning')
         app_state.status_label.classes(css_class)
-        app_state.status_label.set_text(f"Status: {text}")
+        app_state.status_label.set_text(f"{'🔄 ' if app_state.is_processing else 'Status: '}{text}")
 
 # ======================================================================================================================
 # COMMANDS =============================================================================================================
@@ -137,12 +171,16 @@ def set_status(text):
 
 def init_new_repo():
     """Initialize a new Git repository and push to GitHub"""
+    if app_state.is_processing: return
+
     folder = app_state.folder
     url = app_state.url
 
     if not folder or not url:
         ui.notify("⚠️ Please enter both folder path and GitHub URL!", type='warning')
         return
+
+    set_processing(True)
     set_status("Processing...")
 
     try:
@@ -254,10 +292,16 @@ def init_new_repo():
 
     except Exception as e:
         ui.notify(f"❌ Error: {str(e)}", type='negative')
-    validate_fields()
+
+    finally:
+        set_processing(False)
+        validate_fields()
+
 
 def commit_changes():
     """Commit all changes"""
+    if app_state.is_processing: return
+
     folder = app_state.folder
     msg = app_state.commit_msg
 
@@ -267,101 +311,114 @@ def commit_changes():
     if not validate_environment(folder):
         return
 
+    set_processing(True)
     set_status("Checking for changes...")
 
-    # Check if there are changes
-    status = subprocess.run(
-        ['git', '-C', folder, 'status', '--porcelain'],
-        capture_output=True, text=True, creationflags=STARTUP_FLAGS
-    )
+    try:
+        # Check if there are changes
+        status = subprocess.run(
+            ['git', '-C', folder, 'status', '--porcelain'],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
 
-    if not status.stdout.strip():
-        ui.notify("ℹ️ No changes detected. Git doesn't track empty folders.", type='info')
-        set_status("NO CHANGES")
-        return
-    set_status("Adding and committing...")
+        if not status.stdout.strip():
+            ui.notify("ℹ️ No changes detected. Git doesn't track empty folders.", type='info')
+            set_status("NO CHANGES")
+            return
+        set_status("Adding and committing...")
 
-    # Add and commit
-    subprocess.run(['git', '-C', folder, 'add', '-A'], creationflags=STARTUP_FLAGS)
-    result = subprocess.run(
-        ['git', '-C', folder, 'commit', '-m', msg],
-        capture_output=True, text=True, creationflags=STARTUP_FLAGS
-    )
+        # Add and commit
+        subprocess.run(['git', '-C', folder, 'add', '-A'], creationflags=STARTUP_FLAGS)
+        result = subprocess.run(
+            ['git', '-C', folder, 'commit', '-m', msg],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
 
-    if result.returncode == 0:
-        app_state.save_history(folder)
-        set_status("✅ READY TO PUSH")
-        ui.notify("✅ Commit successful!", type='positive')
-    else:
-        ui.notify(f"❌ Commit failed: {result.stderr}", type='negative')
+        if result.returncode == 0:
+            app_state.save_history(folder)
+            set_status("✅ READY TO PUSH")
+            ui.notify("✅ Commit successful!", type='positive')
+        else:
+            ui.notify(f"❌ Commit failed: {result.stderr}", type='negative')
 
-    validate_fields()
+    finally:
+        set_processing(False)
+        validate_fields()
 
 def push_to_github():
     """Push to GitHub"""
+    if app_state.is_processing: return
+
     folder = app_state.folder
     branch = app_state.branch or "main"
 
     if not validate_environment(folder): return
 
+    set_processing(True)
     set_status(f"Checking {branch}...")
 
-    # Ensure we're on the right branch
-    checkout_res = subprocess.run(
-        ['git', '-C', folder, 'checkout', branch],
-        capture_output=True, text=True, creationflags=STARTUP_FLAGS
-    )
-    if checkout_res.returncode != 0:
-        # Create branch if it doesn't exist
-        create_res = subprocess.run(
-            ['git', '-C', folder, 'checkout', '-b', branch],
+    try:
+        # Ensure we're on the right branch
+        checkout_res = subprocess.run(
+            ['git', '-C', folder, 'checkout', branch],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
         )
-        if create_res.returncode != 0:
-            ui.notify(f"❌ Could not switch to branch '{branch}': {checkout_res.stderr}", type='negative')
+        if checkout_res.returncode != 0:
+            # Create branch if it doesn't exist
+            create_res = subprocess.run(
+                ['git', '-C', folder, 'checkout', '-b', branch],
+                capture_output=True, text=True, creationflags=STARTUP_FLAGS
+            )
+            if create_res.returncode != 0:
+                ui.notify(f"❌ Could not switch to branch '{branch}': {checkout_res.stderr}", type='negative')
+                return
+            else:
+                set_status(f"✅ CREATED & SWITCHED TO BRANCH: {branch}")
+        else:
+            set_status(f"✅ SWITCHED TO BRANCH: {branch}")
+
+        # Check for uncommitted changes
+        status = subprocess.run(
+            ['git', '-C', folder, 'status', '--porcelain'],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
+        if status.stdout.strip():
+            ui.notify("⚠️ Uncommitted changes detected! Commit them first.", type='warning')
             return
+
+        # Check if needs pushing
+        check_push = subprocess.run(
+            ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
+        if not check_push.stdout.strip():
+            ui.notify("ℹ️ Everything is already up to date!", type='info')
+            return
+
+        set_status("PUSHING TO GITHUB...")
+        result = subprocess.run(
+            ['git', '-C', folder, 'push', '-u', 'origin', branch],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
+
+        if result.returncode == 0:
+            app_state.save_history(folder)
+            set_status("✅ REPOSITORY UPDATED")
+            ui.notify("✅ Push successful!", type='positive')
         else:
-            set_status(f"✅ CREATED & SWITCHED TO BRANCH: {branch}")
-    else:
-        set_status(f"✅ SWITCHED TO BRANCH: {branch}")
+            if "rejected" in result.stderr.lower():
+                ui.notify("⚠️ Remote has new commits! Pull first, then push.", type='warning')
+            else:
+                ui.notify(f"❌ Push failed: {result.stderr}", type='negative')
 
-    # Check for uncommitted changes
-    status = subprocess.run(
-        ['git', '-C', folder, 'status', '--porcelain'],
-        capture_output=True, text=True, creationflags=STARTUP_FLAGS
-    )
-    if status.stdout.strip():
-        ui.notify("⚠️ Uncommitted changes detected! Commit them first.", type='warning')
-        return
-
-    # Check if needs pushing
-    check_push = subprocess.run(
-        ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
-        capture_output=True, text=True, creationflags=STARTUP_FLAGS
-    )
-    if not check_push.stdout.strip():
-        ui.notify("ℹ️ Everything is already up to date!", type='info')
-        return
-
-    set_status("PUSHING TO GITHUB...")
-    result = subprocess.run(
-        ['git', '-C', folder, 'push', '-u', 'origin', branch],
-        capture_output=True, text=True, creationflags=STARTUP_FLAGS
-    )
-
-    if result.returncode == 0:
-        app_state.save_history(folder)
-        set_status("✅ REPOSITORY UPDATED")
-        ui.notify("✅ Push successful!", type='positive')
-    else:
-        if "rejected" in result.stderr.lower():
-            ui.notify("⚠️ Remote has new commits! Pull first, then push.", type='warning')
-        else:
-            ui.notify(f"❌ Push failed: {result.stderr}", type='negative')
-    validate_fields()
+    finally:
+        set_processing(False)
+        validate_fields()
 
 def pull_from_github():
     """Pull latest changes from GitHub"""
+    if app_state.is_processing: return
+
     folder = app_state.folder
     branch = app_state.branch or "main"
 
@@ -371,28 +428,34 @@ def pull_from_github():
     if not validate_environment(folder):
         return
 
+    set_processing(True)
     set_status(f"PULLING FROM {branch}...")
 
-    # Pull
-    result = subprocess.run(
-        ['git', '-C', folder, 'pull', 'origin', branch],
-        capture_output=True, text=True, creationflags=STARTUP_FLAGS
-    )
+    try:
+        # Pull
+        result = subprocess.run(
+            ['git', '-C', folder, 'pull', 'origin', branch],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
 
-    if result.returncode == 0:
-        app_state.save_history(folder)
-        set_status("✅ PULL SUCCESSFUL")
-        ui.notify(f"✅ Successfully pulled from '{branch}'!", type='positive')
-    else:
-        if "no such remote" in result.stderr.lower():
-            ui.notify("⚠️ No remote 'origin' found. Initialize the repo first.", type='warning')
+        if result.returncode == 0:
+            app_state.save_history(folder)
+            set_status("✅ PULL SUCCESSFUL")
+            ui.notify(f"✅ Successfully pulled from '{branch}'!", type='positive')
         else:
-            ui.notify(f"❌ Pull failed: {result.stderr}", type='negative')
-    validate_fields()
+            if "no such remote" in result.stderr.lower():
+                ui.notify("⚠️ No remote 'origin' found. Initialize the repo first.", type='warning')
+            else:
+                ui.notify(f"❌ Pull failed: {result.stderr}", type='negative')
 
+    finally:
+        set_processing(False)
+        validate_fields()
 
 def do_all():
     """Commit and push in one action"""
+    if app_state.is_processing: return
+
     folder = app_state.folder
     msg = app_state.commit_msg
 
@@ -401,40 +464,47 @@ def do_all():
         return
 
     # Check unpushed commits
+    set_processing(True)
     set_status("Checking for unpushed commits...")
-    branch = app_state.branch or "main"
-    check_push = subprocess.run(
-        ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
-        capture_output=True, text=True, creationflags=STARTUP_FLAGS
-    )
 
-    has_unpushed_commits = bool(check_push.stdout.strip())
-    if has_unpushed_commits:
-        # Push
-        set_status("Found unpushed commits - pushing...")
-        push_to_github()
-        return
+    try:
+        branch = app_state.branch or "main"
+        check_push = subprocess.run(
+            ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
 
-    # Try commit
-    set_status("Committing changes...")
-
-    # Check new commits
-    status = subprocess.run(
-        ['git', '-C', folder, 'status', '--porcelain'],
-        capture_output=True, text=True, creationflags=STARTUP_FLAGS
-    )
-
-    if status.stdout.strip():
-        # Commit
-        commit_changes()
-        # Push
-        if app_state.status_text != "NO CHANGES":
-            set_status("Pushing to GitHub...")
+        has_unpushed_commits = bool(check_push.stdout.strip())
+        if has_unpushed_commits:
+            # Push
+            set_status("Found unpushed commits - pushing...")
             push_to_github()
-    else:
-        # No changes to commit, no commits to push
-        ui.notify("ℹ️ No changes to commit and nothing to push.", type='info')
-        set_status("EVERYTHING IS UP TO DATE")
+            return
+
+        # Try commit
+        set_status("Committing changes...")
+
+        # Check new commits
+        status = subprocess.run(
+            ['git', '-C', folder, 'status', '--porcelain'],
+            capture_output=True, text=True, creationflags=STARTUP_FLAGS
+        )
+
+        if status.stdout.strip():
+            # Commit
+            commit_changes()
+            # Push
+            if app_state.status_text != "NO CHANGES":
+                set_status("Pushing to GitHub...")
+                push_to_github()
+        else:
+            # No changes to commit, no commits to push
+            ui.notify("ℹ️ No changes to commit and nothing to push.", type='info')
+            set_status("EVERYTHING IS UP TO DATE")
+
+    finally:
+        set_processing(False)
+        validate_fields()
 
 def set_folder(path):
     """Set folder from history chip"""
@@ -627,9 +697,15 @@ def main_page():
                                 on_click=pull_from_github
                             ).props('color=dark text-white').classes('flex-1')
                             app_state.pull_button.disable()
-        # Status bar - directly attached, no card wrapper
+        # Status bar
         with ui.column().classes('w-full status-bar'):
-            app_state.status_label = ui.label('Status: READY').classes('text-center status-neutral')
+            with ui.row().classes('w-full items-center justify-center gap-3'):
+                # Spinner
+                app_state.spinner = ui.spinner('dots', size='20px') \
+                    .props('color=primary') \
+                    .classes('hidden')
+                # Status text
+                app_state.status_label = ui.label('Status: READY').classes('text-center status-neutral')
     # Init validation state
     validate_fields()
     return
