@@ -390,6 +390,7 @@ def pull_from_github():
             ui.notify(f"❌ Pull failed: {result.stderr}", type='negative')
     validate_fields()
 
+
 def do_all():
     """Commit and push in one action"""
     folder = app_state.folder
@@ -399,14 +400,41 @@ def do_all():
         ui.notify("⚠️ Please enter both folder path and commit message!", type='warning')
         return
 
-    # Commit
-    set_status("Committing changes...")
-    commit_changes()
+    # Check unpushed commits
+    set_status("Checking for unpushed commits...")
+    branch = app_state.branch or "main"
+    check_push = subprocess.run(
+        ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
+        capture_output=True, text=True, creationflags=STARTUP_FLAGS
+    )
 
-    # Push
-    if app_state.status_text != "NO CHANGES" and app_state.status_text != "READY TO PUSH":
-        set_status("Pushing to GitHub...")
+    has_unpushed_commits = bool(check_push.stdout.strip())
+    if has_unpushed_commits:
+        # Push
+        set_status("Found unpushed commits - pushing...")
         push_to_github()
+        return
+
+    # Try commit
+    set_status("Committing changes...")
+
+    # Check new commits
+    status = subprocess.run(
+        ['git', '-C', folder, 'status', '--porcelain'],
+        capture_output=True, text=True, creationflags=STARTUP_FLAGS
+    )
+
+    if status.stdout.strip():
+        # Commit
+        commit_changes()
+        # Push
+        if app_state.status_text != "NO CHANGES":
+            set_status("Pushing to GitHub...")
+            push_to_github()
+    else:
+        # No changes to commit, no commits to push
+        ui.notify("ℹ️ No changes to commit and nothing to push.", type='info')
+        set_status("EVERYTHING IS UP TO DATE")
 
 def set_folder(path):
     """Set folder from history chip"""
