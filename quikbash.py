@@ -1,6 +1,7 @@
 from nicegui import ui, app
 import os
 import subprocess
+import asyncio
 
 HISTORY_FILE = "qb_history.txt"
 STARTUP_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
@@ -11,6 +12,7 @@ light = "#ffffff"
 dark = "#262626"
 success = "#00f48e"
 warning = "#ff0f39"
+
 
 # ======================================================================================================================
 # STATE MANAGEMENT =====================================================================================================
@@ -58,8 +60,10 @@ class Main:
         with open(HISTORY_FILE, 'w') as f:
             f.write('\n'.join(self.history))
 
+
 # Create a single state instance
 app_state = Main()
+
 
 # ======================================================================================================================
 # VALIDATION ===========================================================================================================
@@ -75,7 +79,8 @@ def validate_fields():
             app_state.init_button.disable()
 
     # For repo commands
-    can_operate = bool(app_state.folder and app_state.folder.strip() and app_state.commit_msg and app_state.commit_msg.strip())
+    can_operate = bool(
+        app_state.folder and app_state.folder.strip() and app_state.commit_msg and app_state.commit_msg.strip())
     if app_state.commit_button:
         if can_operate:
             app_state.commit_button.enable()
@@ -98,6 +103,7 @@ def validate_fields():
             app_state.pull_button.enable()
         else:
             app_state.pull_button.disable()
+
 
 def validate_environment(folder_name, check_git=True):
     """Verify if folder exists and if a Git repo"""
@@ -146,6 +152,7 @@ def set_processing(active):
 
     ui.update()
 
+
 def set_status(text):
     """Update status text with color coding"""
     app_state.status_text = text
@@ -160,13 +167,14 @@ def set_status(text):
         app_state.status_label.classes(remove='status-neutral status-success status-warning')
         app_state.status_label.classes(css_class)
         app_state.status_label.set_text(text)
-        ui.update()  # Force UI refresh
+        ui.update()
+
 
 # ======================================================================================================================
 # COMMANDS =============================================================================================================
 # ======================================================================================================================
 
-def init_new_repo():
+async def init_new_repo():
     """Initialize a new Git repository and push to GitHub"""
     if app_state.is_processing:
         return
@@ -180,6 +188,7 @@ def init_new_repo():
 
     set_processing(True)
     set_status("Processing...")
+    await asyncio.sleep(0.01)  # Allow UI to update
 
     try:
         is_git = subprocess.run(
@@ -249,6 +258,8 @@ def init_new_repo():
                 return
 
         set_status("CHECKING REMOTE...")
+        await asyncio.sleep(0.01)
+
         remote_check = subprocess.run(
             ['git', '-C', folder, 'ls-remote', 'origin', 'main'],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
@@ -256,6 +267,7 @@ def init_new_repo():
 
         if remote_check.stdout.strip():
             set_status("REMOTE HAS CONTENT - PULLING...")
+            await asyncio.sleep(0.01)
             pull_result = subprocess.run(
                 ['git', '-C', folder, 'pull', 'origin', 'main', '--allow-unrelated-histories'],
                 capture_output=True, text=True, creationflags=STARTUP_FLAGS
@@ -264,6 +276,8 @@ def init_new_repo():
                 ui.notify(f"⚠️ Pull had issues: {pull_result.stderr}", type='warning')
 
         set_status("PUSHING TO GITHUB...")
+        await asyncio.sleep(0.01)
+
         result = subprocess.run(
             ['git', '-C', folder, 'push', '-u', 'origin', 'main'],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
@@ -284,7 +298,8 @@ def init_new_repo():
         set_processing(False)
         validate_fields()
 
-def commit_changes():
+
+async def commit_changes():
     """Commit all changes"""
     if app_state.is_processing:
         return
@@ -301,6 +316,7 @@ def commit_changes():
 
     set_processing(True)
     set_status("Checking for changes...")
+    await asyncio.sleep(0.01)
 
     try:
         status = subprocess.run(
@@ -314,6 +330,8 @@ def commit_changes():
             return
 
         set_status("Adding and committing...")
+        await asyncio.sleep(0.01)
+
         subprocess.run(['git', '-C', folder, 'add', '-A'], creationflags=STARTUP_FLAGS)
         result = subprocess.run(
             ['git', '-C', folder, 'commit', '-m', msg],
@@ -335,7 +353,8 @@ def commit_changes():
         set_processing(False)
         validate_fields()
 
-def push_to_github():
+
+async def push_to_github():
     """Push to GitHub"""
     if app_state.is_processing:
         return
@@ -348,6 +367,7 @@ def push_to_github():
 
     set_processing(True)
     set_status(f"Checking {branch}...")
+    await asyncio.sleep(0.01)
 
     try:
         checkout_res = subprocess.run(
@@ -385,6 +405,8 @@ def push_to_github():
             return
 
         set_status("PUSHING TO GITHUB...")
+        await asyncio.sleep(0.01)
+
         result = subprocess.run(
             ['git', '-C', folder, 'push', '-u', 'origin', branch],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
@@ -410,7 +432,8 @@ def push_to_github():
         set_processing(False)
         validate_fields()
 
-def pull_from_github():
+
+async def pull_from_github():
     """Pull latest changes from GitHub"""
     if app_state.is_processing:
         return
@@ -427,6 +450,7 @@ def pull_from_github():
 
     set_processing(True)
     set_status(f"PULLING FROM {branch}...")
+    await asyncio.sleep(0.01)
 
     try:
         result = subprocess.run(
@@ -454,7 +478,8 @@ def pull_from_github():
         set_processing(False)
         validate_fields()
 
-def do_all():
+
+async def do_all():
     """Commit and push in one action"""
     if app_state.is_processing:
         return
@@ -467,6 +492,7 @@ def do_all():
         return
 
     set_status("Checking for unpushed commits...")
+    await asyncio.sleep(0.01)
 
     try:
         branch = app_state.branch or "main"
@@ -480,7 +506,8 @@ def do_all():
 
         if has_unpushed_commits:
             set_status("Found unpushed commits - pushing...")
-            push_to_github()
+            await asyncio.sleep(0.01)
+            await push_to_github()
             return
 
         status = subprocess.run(
@@ -489,10 +516,11 @@ def do_all():
         )
 
         if status.stdout.strip():
-            commit_changes()
+            await commit_changes()
             if "READY TO PUSH" in app_state.status_text:
                 set_status("Pushing to GitHub...")
-                push_to_github()
+                await asyncio.sleep(0.01)
+                await push_to_github()
         else:
             ui.notify("ℹ️ No changes to commit and nothing to push.", type='info')
             set_status("EVERYTHING IS UP TO DATE")
@@ -503,6 +531,7 @@ def do_all():
         set_processing(False)
         validate_fields()
 
+
 def set_folder(path):
     """Set folder from history chip"""
     if path and path.strip():
@@ -511,6 +540,7 @@ def set_folder(path):
             app_state.folder_input.value = path
         app_state.save_history(path)
         validate_fields()
+
 
 def update_folder(path):
     """Update folder and trigger validation"""
@@ -698,6 +728,7 @@ def main_page():
 
     validate_fields()
     return
+
 
 # ======================================================================================================================
 # START ================================================================================================================
