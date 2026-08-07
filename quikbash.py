@@ -437,37 +437,34 @@ def main_page():
             body {{ background: {light}; color: {dark}; }}
             .q-field__label {{ color: {dark} !important; font-weight: bold; }}
             .q-field__control {{ border-color: {dark} !important; }}
+
+            /* Button styles - clean and consistent */
             .nicegui-button,
             .q-btn,
             button.nicegui-button,
             .q-btn.nicegui-button {{
                 border-radius: 4px !important;
                 transition: all 0.2s ease !important;
-                opacity: 0.4 !important;
                 background: {dark} !important;
                 color: {light} !important;
                 border: none !important;
-            }}
-
-            .nicegui-button:enabled,
-            .q-btn:enabled,
-            button.nicegui-button:enabled,
-            .q-btn.nicegui-button:enabled {{
                 opacity: 1 !important;
             }}
 
-            .nicegui-button:enabled:hover,
-            .q-btn:enabled:hover,
-            button.nicegui-button:enabled:hover,
-            .q-btn.nicegui-button:enabled:hover {{
+            /* Hover state for enabled buttons */
+            .nicegui-button:hover:not(:disabled),
+            .q-btn:hover:not(:disabled),
+            button.nicegui-button:hover:not(:disabled),
+            .q-btn.nicegui-button:hover:not(:disabled) {{
                 background: {primary} !important;
                 color: {light} !important;
             }}
 
-            .nicegui-button:enabled:active,
-            .q-btn:enabled:active,
-            button.nicegui-button:enabled:active,
-            .q-btn.nicegui-button:enabled:active {{
+            /* Active/pressed state */
+            .nicegui-button:active:not(:disabled),
+            .q-btn:active:not(:disabled),
+            button.nicegui-button:active:not(:disabled),
+            .q-btn.nicegui-button:active:not(:disabled) {{
                 background: {light} !important;
                 color: {dark} !important;
                 border: 1px solid {dark} !important;
@@ -481,6 +478,7 @@ def main_page():
                 opacity: 0.4 !important;
                 background: {dark} !important;
                 color: {light} !important;
+                cursor: not-allowed !important;
             }}
 
             /* Status bar */
@@ -498,14 +496,7 @@ def main_page():
 
             /* Main container */
             .main-container {{ max-width: 800px; margin: 0 auto; }}
-
-            /* Remove gap between cards and status */
-            .no-gap {{
-                gap: 0 !important;
-            }}
-            .gap-none {{
-                gap: 0 !important;
-            }}
+            .gap-none {{ gap: 0 !important; }}
         </style>
     ''')
 
