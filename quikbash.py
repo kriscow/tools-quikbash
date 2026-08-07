@@ -1,8 +1,6 @@
 from nicegui import ui
 import os
 import subprocess
-import webbrowser
-import time
 
 HISTORY_FILE = "qb_history.txt"
 STARTUP_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
@@ -29,13 +27,13 @@ class Main:
         self.status_text = "READY"
         # controls
         self.status_label = None
+        self.spinner = None
         self.init_button = None
         self.commit_button = None
         self.push_button = None
         self.sync_button = None
         self.pull_button = None
         self.folder_input = None
-        self.spinner = None
         self.is_processing = False
         # history
         self.load_history()
@@ -71,13 +69,13 @@ def validate_fields():
     """Enable/disable buttons based on input"""
     # For init button
     if app_state.init_button:
-        if app_state.folder and app_state.url:
+        if app_state.folder and app_state.folder.strip() and app_state.url and app_state.url.strip():
             app_state.init_button.enable()
         else:
             app_state.init_button.disable()
 
     # For repo commands
-    can_operate = bool(app_state.folder and app_state.commit_msg)
+    can_operate = bool(app_state.folder and app_state.folder.strip() and app_state.commit_msg and app_state.commit_msg.strip())
     if app_state.commit_button:
         if can_operate:
             app_state.commit_button.enable()
@@ -96,7 +94,7 @@ def validate_fields():
 
     # Pull only needs a folder
     if app_state.pull_button:
-        if app_state.folder:
+        if app_state.folder and app_state.folder.strip():
             app_state.pull_button.enable()
         else:
             app_state.pull_button.disable()
@@ -117,7 +115,6 @@ def validate_environment(folder_name, check_git=True):
             return False
     return True
 
-
 def set_processing(active):
     """Show/hide spinner and disable/enable buttons"""
     app_state.is_processing = active
@@ -125,13 +122,9 @@ def set_processing(active):
     if app_state.spinner:
         if active:
             app_state.spinner.classes(remove='hidden')
-            app_state.spinner.classes('inline-block')
         else:
-            app_state.spinner.classes(remove='inline-block')
             app_state.spinner.classes('hidden')
 
-    # Disable/enable all buttons
-    state = "disabled" if active else "enabled"
     buttons = [
         app_state.init_button,
         app_state.commit_button,
@@ -147,7 +140,6 @@ def set_processing(active):
             else:
                 btn.enable()
 
-    # Apply field validation when not processing
     if not active:
         validate_fields()
 
@@ -155,7 +147,6 @@ def set_status(text):
     """Update status text with color coding"""
     app_state.status_text = text
     if app_state.status_label:
-        # Determine color based on status
         if "✅" in text or "SUCCESS" in text or "COMPLETED" in text:
             css_class = "status-success"
         elif "❌" in text or "ERROR" in text or "FAILED" in text:
@@ -165,7 +156,7 @@ def set_status(text):
 
         app_state.status_label.classes(remove='status-neutral status-success status-warning')
         app_state.status_label.classes(css_class)
-        app_state.status_label.set_text(f"{'🔄 ' if app_state.is_processing else 'Status: '}{text}")
+        app_state.status_label.set_text(text)
 
 # ======================================================================================================================
 # COMMANDS =============================================================================================================
@@ -173,7 +164,8 @@ def set_status(text):
 
 def init_new_repo():
     """Initialize a new Git repository and push to GitHub"""
-    if app_state.is_processing: return
+    if app_state.is_processing:
+        return
 
     folder = app_state.folder
     url = app_state.url
@@ -186,12 +178,11 @@ def init_new_repo():
     set_status("Processing...")
 
     try:
-        # Check if already a git repo
         is_git = subprocess.run(
             ['git', '-C', folder, 'rev-parse', '--is-inside-work-tree'],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
         )
-        # Init if not a git repo
+
         if is_git.returncode != 0:
             result = subprocess.run(
                 ['git', '-C', folder, 'init'],
@@ -201,7 +192,6 @@ def init_new_repo():
                 ui.notify(f"❌ Failed to init: {result.stderr}", type='negative')
                 return
 
-        # Add all files
         result = subprocess.run(
             ['git', '-C', folder, 'add', '.'],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
@@ -210,7 +200,6 @@ def init_new_repo():
             ui.notify(f"❌ Failed to add: {result.stderr}", type='negative')
             return
 
-        # Check if there are changes to commit
         status = subprocess.run(
             ['git', '-C', folder, 'status', '--porcelain'],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
@@ -224,10 +213,7 @@ def init_new_repo():
             if result.returncode != 0:
                 ui.notify(f"❌ Failed at commit: {result.stderr}", type='negative')
                 return
-        else:
-            set_status("NO CHANGES TO COMMIT")
 
-        # Default to main
         result = subprocess.run(
             ['git', '-C', folder, 'branch', '-M', 'main'],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
@@ -236,7 +222,6 @@ def init_new_repo():
             ui.notify(f"❌ Failed to set branch: {result.stderr}", type='negative')
             return
 
-        # Check if remote already exists
         remote_check = subprocess.run(
             ['git', '-C', folder, 'remote', 'get-url', 'origin'],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
@@ -259,14 +244,12 @@ def init_new_repo():
                 ui.notify(f"❌ Failed to update remote: {result.stderr}", type='negative')
                 return
 
-        # Check if remote has content
         set_status("CHECKING REMOTE...")
         remote_check = subprocess.run(
             ['git', '-C', folder, 'ls-remote', 'origin', 'main'],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
         )
 
-        # Only pull if remote has content
         if remote_check.stdout.strip():
             set_status("REMOTE HAS CONTENT - PULLING...")
             pull_result = subprocess.run(
@@ -275,10 +258,7 @@ def init_new_repo():
             )
             if pull_result.returncode != 0:
                 ui.notify(f"⚠️ Pull had issues: {pull_result.stderr}", type='warning')
-        else:
-            set_status("REMOTE IS EMPTY - READY TO PUSH")
 
-        # Push
         set_status("PUSHING TO GITHUB...")
         result = subprocess.run(
             ['git', '-C', folder, 'push', '-u', 'origin', 'main'],
@@ -300,10 +280,10 @@ def init_new_repo():
         set_processing(False)
         validate_fields()
 
-
 def commit_changes():
     """Commit all changes"""
-    if app_state.is_processing: return
+    if app_state.is_processing:
+        return
 
     folder = app_state.folder
     msg = app_state.commit_msg
@@ -311,6 +291,7 @@ def commit_changes():
     if not msg:
         ui.notify("⚠️ Please enter a commit message!", type='warning')
         return
+
     if not validate_environment(folder):
         return
 
@@ -318,7 +299,6 @@ def commit_changes():
     set_status("Checking for changes...")
 
     try:
-        # Check if there are changes
         status = subprocess.run(
             ['git', '-C', folder, 'status', '--porcelain'],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
@@ -328,9 +308,8 @@ def commit_changes():
             ui.notify("ℹ️ No changes detected. Git doesn't track empty folders.", type='info')
             set_status("NO CHANGES")
             return
-        set_status("Adding and committing...")
 
-        # Add and commit
+        set_status("Adding and committing...")
         subprocess.run(['git', '-C', folder, 'add', '-A'], creationflags=STARTUP_FLAGS)
         result = subprocess.run(
             ['git', '-C', folder, 'commit', '-m', msg],
@@ -354,24 +333,24 @@ def commit_changes():
 
 def push_to_github():
     """Push to GitHub"""
-    if app_state.is_processing: return
+    if app_state.is_processing:
+        return
 
     folder = app_state.folder
     branch = app_state.branch or "main"
 
-    if not validate_environment(folder): return
+    if not validate_environment(folder):
+        return
 
     set_processing(True)
     set_status(f"Checking {branch}...")
 
     try:
-        # Ensure we're on the right branch
         checkout_res = subprocess.run(
             ['git', '-C', folder, 'checkout', branch],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
         )
         if checkout_res.returncode != 0:
-            # Create branch if it doesn't exist
             create_res = subprocess.run(
                 ['git', '-C', folder, 'checkout', '-b', branch],
                 capture_output=True, text=True, creationflags=STARTUP_FLAGS
@@ -384,7 +363,6 @@ def push_to_github():
         else:
             set_status(f"✅ SWITCHED TO BRANCH: {branch}")
 
-        # Check for uncommitted changes
         status = subprocess.run(
             ['git', '-C', folder, 'status', '--porcelain'],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
@@ -393,13 +371,13 @@ def push_to_github():
             ui.notify("⚠️ Uncommitted changes detected! Commit them first.", type='warning')
             return
 
-        # Check if needs pushing
         check_push = subprocess.run(
             ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
         )
         if not check_push.stdout.strip():
             ui.notify("ℹ️ Everything is already up to date!", type='info')
+            set_status("EVERYTHING UP TO DATE")
             return
 
         set_status("PUSHING TO GITHUB...")
@@ -415,8 +393,10 @@ def push_to_github():
         else:
             if "rejected" in result.stderr.lower():
                 ui.notify("⚠️ Remote has new commits! Pull first, then push.", type='warning')
+                set_status("PUSH REJECTED - NEED PULL")
             else:
                 ui.notify(f"❌ Push failed: {result.stderr}", type='negative')
+                set_status("PUSH FAILED")
 
     except Exception as e:
         ui.notify(f"❌ Error: {str(e)}", type='negative')
@@ -428,7 +408,8 @@ def push_to_github():
 
 def pull_from_github():
     """Pull latest changes from GitHub"""
-    if app_state.is_processing: return
+    if app_state.is_processing:
+        return
 
     folder = app_state.folder
     branch = app_state.branch or "main"
@@ -436,6 +417,7 @@ def pull_from_github():
     if not folder:
         ui.notify("⚠️ Please enter a folder path!", type='warning')
         return
+
     if not validate_environment(folder):
         return
 
@@ -443,7 +425,6 @@ def pull_from_github():
     set_status(f"PULLING FROM {branch}...")
 
     try:
-        # Pull
         result = subprocess.run(
             ['git', '-C', folder, 'pull', 'origin', branch],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
@@ -456,8 +437,10 @@ def pull_from_github():
         else:
             if "no such remote" in result.stderr.lower():
                 ui.notify("⚠️ No remote 'origin' found. Initialize the repo first.", type='warning')
+                set_status("NO REMOTE FOUND")
             else:
                 ui.notify(f"❌ Pull failed: {result.stderr}", type='negative')
+                set_status("PULL FAILED")
 
     except Exception as e:
         ui.notify(f"❌ Error: {str(e)}", type='negative')
@@ -469,7 +452,8 @@ def pull_from_github():
 
 def do_all():
     """Commit and push in one action"""
-    if app_state.is_processing: return
+    if app_state.is_processing:
+        return
 
     folder = app_state.folder
     msg = app_state.commit_msg
@@ -478,41 +462,34 @@ def do_all():
         ui.notify("⚠️ Please enter both folder path and commit message!", type='warning')
         return
 
-    # Check unpushed commits
     set_status("Checking for unpushed commits...")
 
     try:
         branch = app_state.branch or "main"
+
         check_push = subprocess.run(
             ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
         )
 
         has_unpushed_commits = bool(check_push.stdout.strip())
+
         if has_unpushed_commits:
-            # Push
             set_status("Found unpushed commits - pushing...")
             push_to_github()
             return
 
-        # Try commit
-        set_status("Committing changes...")
-
-        # Check new commits
         status = subprocess.run(
             ['git', '-C', folder, 'status', '--porcelain'],
             capture_output=True, text=True, creationflags=STARTUP_FLAGS
         )
 
         if status.stdout.strip():
-            # Commit
             commit_changes()
-            # Push
-            if app_state.status_text != "NO CHANGES":
+            if "READY TO PUSH" in app_state.status_text:
                 set_status("Pushing to GitHub...")
                 push_to_github()
         else:
-            # No changes to commit, no commits to push
             ui.notify("ℹ️ No changes to commit and nothing to push.", type='info')
             set_status("EVERYTHING IS UP TO DATE")
 
@@ -524,17 +501,20 @@ def do_all():
 
 def set_folder(path):
     """Set folder from history chip"""
-    app_state.folder = path
-    if app_state.folder_input:
-        app_state.folder_input.value = path
-    app_state.save_history(path)
-    validate_fields()
+    if path and path.strip():
+        app_state.folder = path
+        if app_state.folder_input:
+            app_state.folder_input.value = path
+        app_state.save_history(path)
+        validate_fields()
 
 def update_folder(path):
     """Update folder and trigger validation"""
-    if path and path != app_state.folder:
+    # Check if path is different from current folder
+    if path != app_state.folder:
         app_state.folder = path
-        app_state.save_history(path)
+        if path and path.strip():
+            app_state.save_history(path)
         validate_fields()
 
 
@@ -547,12 +527,10 @@ def main_page():
     ui.page_title("QuikBash")
     ui.add_head_html(f'''
         <style>
-            /* Global styles */
             body {{ background: {light}; color: {dark}; }}
             .q-field__label {{ color: {dark} !important; font-weight: bold; }}
             .q-field__control {{ border-color: {dark} !important; }}
 
-            /* Button styles - clean and consistent */
             .nicegui-button,
             .q-btn,
             button.nicegui-button,
@@ -565,7 +543,6 @@ def main_page():
                 opacity: 1 !important;
             }}
 
-            /* Hover state for enabled buttons */
             .nicegui-button:hover:not(:disabled),
             .q-btn:hover:not(:disabled),
             button.nicegui-button:hover:not(:disabled),
@@ -574,7 +551,6 @@ def main_page():
                 color: {light} !important;
             }}
 
-            /* Active/pressed state */
             .nicegui-button:active:not(:disabled),
             .q-btn:active:not(:disabled),
             button.nicegui-button:active:not(:disabled),
@@ -584,7 +560,6 @@ def main_page():
                 border: 1px solid {dark} !important;
             }}
 
-            /* Disabled state */
             .nicegui-button:disabled,
             .q-btn:disabled,
             button.nicegui-button:disabled,
@@ -595,7 +570,6 @@ def main_page():
                 cursor: not-allowed !important;
             }}
 
-            /* Status bar */
             .status-bar {{
                 background: {light};
                 padding: 12px;
@@ -608,9 +582,9 @@ def main_page():
             .status-success {{ color: {success}; }}
             .status-warning {{ color: {warning}; }}
 
-            /* Main container */
             .main-container {{ max-width: 800px; margin: 0 auto; }}
             .gap-none {{ gap: 0 !important; }}
+            .hidden {{ display: none !important; }}
         </style>
     ''')
 
@@ -637,12 +611,12 @@ def main_page():
                     with ui.row().classes('gap-1 flex-wrap'):
                         ui.label('Recent:').classes('text-caption').style(f'color: {dark}; opacity: 0.6')
                         for path in app_state.history[:3]:
-                            ui.chip(
+                            chip = ui.chip(
                                 os.path.basename(path) if os.path.basename(path) else path[:20],
-                                on_click=lambda p=path: set_folder(p),
                                 color=dark,
                                 text_color=dark
-                            ).props('outline dense')
+                            ).props('outline dense clickable')
+                            chip.on('click', lambda p=path: set_folder(p))
 
         # Tabs
         with ui.tabs().classes('w-full') as tabs:
@@ -654,7 +628,6 @@ def main_page():
             with ui.tab_panel(new_repo_tab):
                 with ui.card().classes('w-full'):
                     with ui.column().classes('w-full gap-4 p-4'):
-                        # Remote URL - consistent styling
                         url_input = ui.input('Remote URL:') \
                             .props('outlined') \
                             .classes('w-full') \
@@ -662,24 +635,22 @@ def main_page():
                         url_input.on('change', validate_fields)
                         url_input.on('keyup', lambda: validate_fields())
 
-                        # Init button
                         app_state.init_button = ui.button(
                             'Initialize & Push',
                             on_click=init_new_repo
                         ).props('color=dark text-white').classes('w-full')
                         app_state.init_button.disable()
+
             # Tab 2
             with ui.tab_panel(update_tab):
                 with ui.card().classes('w-full'):
                     with ui.column().classes('w-full gap-4 p-4'):
-                        # Branch - consistent styling
                         branch_input = ui.input('Branch:') \
                             .props('outlined') \
                             .classes('w-full') \
                             .bind_value_to(app_state, 'branch') \
                             .props('placeholder=main')
 
-                        # Commit Message - consistent styling
                         msg_input = ui.input('Commit Message:') \
                             .props('outlined') \
                             .classes('w-full') \
@@ -687,7 +658,6 @@ def main_page():
                         msg_input.on('change', validate_fields)
                         msg_input.on('keyup', lambda: validate_fields())
 
-                        # Command buttons
                         with ui.row().classes('w-full gap-2'):
                             app_state.commit_button = ui.button(
                                 'Commit',
@@ -713,16 +683,15 @@ def main_page():
                                 on_click=pull_from_github
                             ).props('color=dark text-white').classes('flex-1')
                             app_state.pull_button.disable()
+
         # Status bar
         with ui.column().classes('w-full status-bar'):
             with ui.row().classes('w-full items-center justify-center gap-3'):
-                # Spinner
-                app_state.spinner = ui.spinner('dots', size='20px') \
-                    .props('color=primary') \
+                app_state.spinner = ui.spinner('dots', size='24px') \
+                    .props('color=orange') \
                     .classes('hidden')
-                # Status text
-                app_state.status_label = ui.label('Status: READY').classes('text-center status-neutral')
-    # Init validation state
+                app_state.status_label = ui.label('READY').classes('text-center status-neutral')
+
     validate_fields()
     return
 
