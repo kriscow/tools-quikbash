@@ -1,4 +1,4 @@
-from nicegui import ui
+from nicegui import ui, app
 import os
 import subprocess
 
@@ -115,6 +115,7 @@ def validate_environment(folder_name, check_git=True):
             return False
     return True
 
+
 def set_processing(active):
     """Show/hide spinner and disable/enable buttons"""
     app_state.is_processing = active
@@ -143,6 +144,8 @@ def set_processing(active):
     if not active:
         validate_fields()
 
+    ui.update()
+
 def set_status(text):
     """Update status text with color coding"""
     app_state.status_text = text
@@ -157,6 +160,7 @@ def set_status(text):
         app_state.status_label.classes(remove='status-neutral status-success status-warning')
         app_state.status_label.classes(css_class)
         app_state.status_label.set_text(text)
+        ui.update()  # Force UI refresh
 
 # ======================================================================================================================
 # COMMANDS =============================================================================================================
@@ -606,7 +610,7 @@ def main_page():
                 app_state.folder_input.on('change', lambda: update_folder(app_state.folder_input.value))
                 app_state.folder_input.on('keyup', lambda: validate_fields())
 
-                # History chips 
+                # History chips
                 if app_state.history:
                     with ui.row().classes('gap-1 flex-wrap'):
                         ui.label('Recent:').classes('text-caption').style(f'color: {dark}; opacity: 0.6')
