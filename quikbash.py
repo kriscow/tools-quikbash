@@ -35,6 +35,7 @@ class Main:
         self.sync_button = None
         self.pull_button = None
         self.folder_input = None
+        self.spinner = None
         self.is_processing = False
         # history
         self.load_history()
@@ -116,8 +117,9 @@ def validate_environment(folder_name, check_git=True):
             return False
     return True
 
+
 def set_processing(active):
-    """Spinner & button management"""
+    """Show/hide spinner and disable/enable buttons"""
     app_state.is_processing = active
 
     if app_state.spinner:
@@ -128,7 +130,7 @@ def set_processing(active):
             app_state.spinner.classes(remove='inline-block')
             app_state.spinner.classes('hidden')
 
-    # Disable/enable buttons
+    # Disable/enable all buttons
     state = "disabled" if active else "enabled"
     buttons = [
         app_state.init_button,
@@ -145,12 +147,12 @@ def set_processing(active):
             else:
                 btn.enable()
 
-    # Apply field validation when idle
+    # Apply field validation when not processing
     if not active:
         validate_fields()
 
 def set_status(text):
-    """Update status"""
+    """Update status text with color coding"""
     app_state.status_text = text
     if app_state.status_label:
         # Determine color based on status
@@ -292,6 +294,7 @@ def init_new_repo():
 
     except Exception as e:
         ui.notify(f"❌ Error: {str(e)}", type='negative')
+        set_status(f"ERROR: {str(e)}")
 
     finally:
         set_processing(False)
@@ -340,6 +343,10 @@ def commit_changes():
             ui.notify("✅ Commit successful!", type='positive')
         else:
             ui.notify(f"❌ Commit failed: {result.stderr}", type='negative')
+
+    except Exception as e:
+        ui.notify(f"❌ Error: {str(e)}", type='negative')
+        set_status(f"ERROR: {str(e)}")
 
     finally:
         set_processing(False)
@@ -411,6 +418,10 @@ def push_to_github():
             else:
                 ui.notify(f"❌ Push failed: {result.stderr}", type='negative')
 
+    except Exception as e:
+        ui.notify(f"❌ Error: {str(e)}", type='negative')
+        set_status(f"ERROR: {str(e)}")
+
     finally:
         set_processing(False)
         validate_fields()
@@ -448,6 +459,10 @@ def pull_from_github():
             else:
                 ui.notify(f"❌ Pull failed: {result.stderr}", type='negative')
 
+    except Exception as e:
+        ui.notify(f"❌ Error: {str(e)}", type='negative')
+        set_status(f"ERROR: {str(e)}")
+
     finally:
         set_processing(False)
         validate_fields()
@@ -464,7 +479,6 @@ def do_all():
         return
 
     # Check unpushed commits
-    set_processing(True)
     set_status("Checking for unpushed commits...")
 
     try:
@@ -502,7 +516,9 @@ def do_all():
             ui.notify("ℹ️ No changes to commit and nothing to push.", type='info')
             set_status("EVERYTHING IS UP TO DATE")
 
-    finally:
+    except Exception as e:
+        ui.notify(f"❌ Error: {str(e)}", type='negative')
+        set_status(f"ERROR: {str(e)}")
         set_processing(False)
         validate_fields()
 
