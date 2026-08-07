@@ -606,7 +606,7 @@ def main_page():
                 app_state.folder_input.on('change', lambda: update_folder(app_state.folder_input.value))
                 app_state.folder_input.on('keyup', lambda: validate_fields())
 
-                # History chips
+                # History chips 
                 if app_state.history:
                     with ui.row().classes('gap-1 flex-wrap'):
                         ui.label('Recent:').classes('text-caption').style(f'color: {dark}; opacity: 0.6')
