@@ -60,10 +60,12 @@ class Main:
         with open(HISTORY_FILE, 'w') as f:
             f.write('\n'.join(self.history))
 
+    def is_in_history(folder_path):
+        """Check if folder path exists in history"""
+        return folder_path in app_state.history
 
 # Create a single state instance
 app_state = Main()
-
 
 # ======================================================================================================================
 # VALIDATION ===========================================================================================================
@@ -103,6 +105,9 @@ def validate_fields():
             app_state.pull_button.enable()
         else:
             app_state.pull_button.disable()
+
+    # Update new repo button label
+    update_init_button_label()
 
 
 def validate_environment(folder_name, check_git=True):
@@ -540,6 +545,7 @@ def set_folder(path):
             app_state.folder_input.value = path
         app_state.save_history(path)
         validate_fields()
+        update_init_button_label()
 
 
 def update_folder(path):
@@ -550,7 +556,16 @@ def update_folder(path):
         if path and path.strip():
             app_state.save_history(path)
         validate_fields()
+        update_init_button_label()
 
+def update_init_button_label():
+    """Update INITIALIZE/RE-LINK button based on history"""
+    if app_state.init_button:
+        folder = app_state.folder.strip()
+        if folder and folder in app_state.history:
+            app_state.init_button.set_text("RE-LINK")
+        else:
+            app_state.init_button.set_text("INITIALIZE")
 
 # ======================================================================================================================
 # INTERFACE ============================================================================================================
@@ -627,7 +642,7 @@ def main_page():
         with ui.row().classes('w-full items-center justify-between p-4'):
             with ui.row().classes('items-center gap-3'):
                 ui.label('QuikBash').classes('text-h4 font-bold').style(f'color: {dark}')
-                ui.label('v3.0.gamma').classes('text-caption').style(f'color: {dark}')
+                ui.label('v3.5.gamma').classes('text-caption').style(f'color: {dark}')
 
     # Content
     with ui.column().classes('w-full p-4 main-container gap-none'):
@@ -670,7 +685,7 @@ def main_page():
                         url_input.on('keyup', lambda: validate_fields())
 
                         app_state.init_button = ui.button(
-                            'Initialize & Push',
+                            'INITIALIZE',
                             on_click=init_new_repo
                         ).props('color=dark text-white').classes('w-full')
                         app_state.init_button.disable()
@@ -727,6 +742,7 @@ def main_page():
                 app_state.status_label = ui.label('READY').classes('text-center status-neutral')
 
     validate_fields()
+    update_init_button_label()
     return
 
 
