@@ -4,6 +4,7 @@ import os
 import subprocess
 import threading
 
+# Global Variables
 h_file = "qb_history.txt"
 startup_flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
 MAX_HISTORY = 5
@@ -14,9 +15,7 @@ dark = "#262626"
 white = "#FFFFFF"
 green = "#2F6B3F"
 
-# ======================================================================================================================
-# STATE MANAGEMENT
-# ======================================================================================================================
+# STATE MANAGEMENT #####################################################################################################
 
 class AppState:
     def __init__(self):
@@ -24,7 +23,7 @@ class AppState:
         self.load_history()
 
     def load_history(self):
-        """Load saved repository paths"""
+        """Load saved repo path"""
         if os.path.exists(h_file):
             try:
                 with open(h_file, 'r') as f:
@@ -34,7 +33,7 @@ class AppState:
         return self.history
 
     def save_history(self, path):
-        """Save a new repository path"""
+        """Save a new repo path"""
         if path in self.history:
             self.history.remove(path)
         self.history.insert(0, path)
@@ -44,24 +43,23 @@ class AppState:
             f.write('\n'.join(self.history))
 
     def is_in_history(self, path):
-        """Check if folder path exists in history"""
+        """Check if path exists in history"""
         return path in self.history
 
 app_state = AppState()
 
-# ======================================================================================================================
-# VALIDATION
-# ======================================================================================================================
+# VALIDATION ###########################################################################################################
 
 def validate_fields(*args):
-    """Enable/disable buttons based on input"""
-    # For init button
+    """Enable/disable buttons"""
+    # For init / re-link
     if folder_var.get().strip() and url_var.get().strip():
         init_button.config(state="normal")
     else:
         init_button.config(state="disabled")
+    update_init_button_label()
 
-    # For repo commands
+    # For git commands
     can_operate = bool(folder_var.get().strip() and msg_var.get().strip())
     for btn in [anc_button, push_button, sync_button]:
         if can_operate:
@@ -69,17 +67,14 @@ def validate_fields(*args):
         else:
             btn.config(state="disabled")
 
-    # Pull only needs a folder
+    # For git (pull) command
     if folder_var.get().strip():
         pull_button.config(state="normal")
     else:
         pull_button.config(state="disabled")
 
-    # Update init button label
-    update_init_button_label()
-
 def validate_environment(folder_name, check_git=True):
-    """Verify if folder exists and if a Git repo"""
+    """Folder exists && Git repo"""
     if not os.path.isdir(folder_name):
         messagebox.showerror("Error", f"Path '{folder_name}' is not a valid directory.")
         return False
@@ -90,21 +85,17 @@ def validate_environment(folder_name, check_git=True):
             capture_output=True, text=True, creationflags=startup_flags
         )
         if result.returncode != 0:
-            messagebox.showerror("Error", "Not a Git repository. Initialize it first.")
+            messagebox.showerror("Error", "Not a Git repository. Initialize/Re-Link it first.")
             return False
     return True
 
 def update_init_button_label():
-    """Update INITIALIZE/RE-LINK button based on history"""
+    """Update init / re-link button label (history-based)"""
     folder = folder_var.get().strip()
-    if folder and app_state.is_in_history(folder):
-        init_button.config(text="RE-LINK")
-    else:
-        init_button.config(text="INITIALIZE")
+    if folder and app_state.is_in_history(folder): init_button.config(text="RE-LINK")
+    else: init_button.config(text="INITIALIZE")
 
-# ======================================================================================================================
-# HELPERS
-# ======================================================================================================================
+# HELPERS ##############################################################################################################
 
 def run_async(func):
     threading.Thread(target=func, daemon=True).start()
@@ -120,39 +111,37 @@ def update_btns(state):
 def set_status(text):
     update_sts(status_var.set, value=text)
 
-# ======================================================================================================================
-# COMMANDS
-# ======================================================================================================================
+# COMMANDS #############################################################################################################
 
 def init_new_repo():
-    """Initialize a new Git repository and push to GitHub"""
+    """Initialize / Re-Link > Push"""
     folder = folder_var.get().strip()
     url = url_var.get().strip()
 
     if not folder or not url:
-        messagebox.showwarning("Input", "Please enter both folder path and GitHub URL!")
+        messagebox.showwarning("Input", "Please fill up all required fields.")
         return
 
     update_btns("disabled")
     set_status("Processing...")
 
     try:
-        # Check if already a git repo
+        # 1.1) Check if has valid local
         is_git = subprocess.run(
             ['git', '-C', folder, 'rev-parse', '--is-inside-work-tree'],
             capture_output=True, text=True, creationflags=startup_flags
         )
-
+        # 1.2) If local exists, skip and proceed. Otherwise:
         if is_git.returncode != 0:
             result = subprocess.run(
                 ['git', '-C', folder, 'init'],
                 capture_output=True, text=True, creationflags=startup_flags
             )
             if result.returncode != 0:
-                messagebox.showerror("Git Error", f"Failed to init: {result.stderr}")
+                messagebox.showerror("Git Error", f"Failed to link: {result.stderr}")
                 return
 
-        # Add all files
+        # 2) Add / Stage all files
         result = subprocess.run(
             ['git', '-C', folder, 'add', '.'],
             capture_output=True, text=True, creationflags=startup_flags
@@ -161,13 +150,12 @@ def init_new_repo():
             messagebox.showerror("Git Error", f"Failed to add: {result.stderr}")
             return
 
-        # Check if there are changes to commit
+        # 3.1) Check for uncommitted changes
         status = subprocess.run(
             ['git', '-C', folder, 'status', '--porcelain'],
             capture_output=True, text=True, creationflags=startup_flags
         )
-
-        if status.stdout.strip():
+        if status.stdout.strip(): # 3.2) If has uncommitted changes
             result = subprocess.run(
                 ['git', '-C', folder, 'commit', '-m', 'Initial commit'],
                 capture_output=True, text=True, creationflags=startup_flags
@@ -178,22 +166,21 @@ def init_new_repo():
         else:
             set_status("NO CHANGES TO COMMIT")
 
-        # Set branch to main
+        # 4) Set branch to main (default)
         result = subprocess.run(
-            ['git', '-C', folder, 'branch', '-M', 'main'],
+            ['git', '-C', folder, 'branch', '-M', 'main'], # Auto-renames branch to 'main'
             capture_output=True, text=True, creationflags=startup_flags
         )
         if result.returncode != 0:
             messagebox.showerror("Git Error", f"Failed to set branch: {result.stderr}")
             return
 
-        # Check if remote already exists
+        # 5.1) Check if has valid remote
         remote_check = subprocess.run(
-            ['git', '-C', folder, 'remote', 'get-url', 'origin'],
+            ['git', '-C', folder, 'remote', 'get-url', 'origin'], # Check remote 'origin'
             capture_output=True, text=True, creationflags=startup_flags
         )
-
-        if remote_check.returncode != 0:
+        if remote_check.returncode != 0: # 5.2) If no remote
             result = subprocess.run(
                 ['git', '-C', folder, 'remote', 'add', 'origin', url],
                 capture_output=True, text=True, creationflags=startup_flags
@@ -210,16 +197,14 @@ def init_new_repo():
                 messagebox.showerror("Git Error", f"Failed to update remote: {result.stderr}")
                 return
 
-        # Check if remote has content
+        # 5.3) Check remote content
         set_status("CHECKING REMOTE...")
         remote_check = subprocess.run(
             ['git', '-C', folder, 'ls-remote', 'origin', 'main'],
             capture_output=True, text=True, creationflags=startup_flags
         )
-
-        # Only try to pull if remote has content
-        if remote_check.stdout.strip():
-            set_status("REMOTE HAS CONTENT - PULLING...")
+        if remote_check.stdout.strip(): # 5.4) Pull if remote has content
+            set_status("REMOTE HAS CONTENT > PULLING...")
             pull_result = subprocess.run(
                 ['git', '-C', folder, 'pull', 'origin', 'main', '--allow-unrelated-histories'],
                 capture_output=True, text=True, creationflags=startup_flags
@@ -227,10 +212,10 @@ def init_new_repo():
             if pull_result.returncode != 0:
                 messagebox.showwarning("Pull Warning", f"Pull had issues:\n{pull_result.stderr}")
         else:
-            set_status("REMOTE IS EMPTY - READY TO PUSH")
+            set_status("REMOTE EMPTY > PUSHING...")
 
-        # Push to GitHub
-        set_status("PUSHING TO GITHUB...")
+        # 6) Push
+        set_status("PUSHING...")
         result = subprocess.run(
             ['git', '-C', folder, 'push', '-u', 'origin', 'main'],
             capture_output=True, text=True, creationflags=startup_flags
@@ -240,18 +225,16 @@ def init_new_repo():
             return
 
         app_state.save_history(folder)
-        set_status("✅ CONNECTED TO GITHUB")
-        messagebox.showinfo("Success", "Repository successfully initialized and pushed!")
-
+        set_status("INITIALIZE SUCCESS")
+        messagebox.showinfo("Success", "Initialization finished!")
     except Exception as e:
         messagebox.showerror("Error", str(e))
-
     finally:
         update_btns("normal")
         validate_fields()
 
 def do_all():
-    """Commit and push in one action"""
+    """Add > Commit > Push"""
     folder = folder_var.get().strip()
     branch = branch_var.get().strip() or "main"
     msg = msg_var.get().strip()
@@ -264,12 +247,11 @@ def do_all():
     set_status("Checking for unpushed commits...")
 
     try:
-        # Check if we have unpushed commits
+        # 1) Check unpushed commits
         check_push = subprocess.run(
             ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
             capture_output=True, text=True, creationflags=startup_flags
         )
-
         has_unpushed = bool(check_push.stdout.strip())
 
         if has_unpushed:
@@ -277,37 +259,33 @@ def do_all():
             push_to_github()
             return
 
-        # Check for uncommitted changes
+        # 2.1) Check uncommitted changes
         status = subprocess.run(
             ['git', '-C', folder, 'status', '--porcelain'],
             capture_output=True, text=True, creationflags=startup_flags
         )
-
-        if status.stdout.strip():
+        if status.stdout.strip(): # 2.2) If has uncommitted changes
             commit_changes()
             if status_var.get() == "READY TO PUSH":
-                set_status("Pushing to GitHub...")
+                set_status("PUSHING...")
                 push_to_github()
         else:
             messagebox.showinfo("Status", "No changes detected.")
             set_status("EVERYTHING IS UP TO DATE")
-
     except Exception as e:
         messagebox.showerror("Error", str(e))
-
     finally:
         update_btns("normal")
         validate_fields()
 
 def commit_changes():
-    """Add all and commit changes"""
+    """Add > Commit"""
     folder = folder_var.get().strip()
     msg = msg_var.get().strip()
 
     if not msg:
-        messagebox.showwarning("Input", "Please enter a commit message!")
+        messagebox.showwarning("Input", "Please enter a commit message.")
         return
-
     if not validate_environment(folder):
         return
 
@@ -315,55 +293,52 @@ def commit_changes():
     set_status("Checking for changes...")
 
     try:
+        # 1.1) Check for content changes
         status = subprocess.run(
             ['git', '-C', folder, 'status', '--porcelain'],
             capture_output=True, text=True, creationflags=startup_flags
         )
-
-        if not status.stdout.strip():
-            messagebox.showinfo("Status", "No changes detected.\n\nTip: Git doesn't track empty folders.")
+        if not status.stdout.strip(): # 1.2) If no content changes
+            messagebox.showinfo("Status", "No changes detected.\n\nGit doesn't track empty folders.")
             set_status("NO CHANGES")
             return
 
-        set_status("Adding and committing...")
+        # 2) If has content changes
+        set_status("STAGING & COMMITTING...")
         subprocess.run(['git', '-C', folder, 'add', '-A'], creationflags=startup_flags)
         result = subprocess.run(
             ['git', '-C', folder, 'commit', '-m', msg],
             capture_output=True, text=True, creationflags=startup_flags
         )
-
         if result.returncode == 0:
             app_state.save_history(folder)
-            set_status("✅ READY TO PUSH")
-            messagebox.showinfo("Success", "Commit successful!")
+            set_status("READY TO PUSH")
+            messagebox.showinfo("Success", "Changes have been committed!")
         else:
             messagebox.showerror("Git Error", result.stderr)
-
     except Exception as e:
         messagebox.showerror("Error", str(e))
-
     finally:
         update_btns("normal")
         validate_fields()
 
 def push_to_github():
-    """Push to GitHub"""
+    """Push"""
     folder = folder_var.get().strip()
     branch = branch_var.get().strip() or "main"
 
-    if not validate_environment(folder):
-        return
+    if not validate_environment(folder): return
 
     update_btns("disabled")
     set_status(f"Checking {branch}...")
 
     try:
-        # Ensure we're on the right branch
+        # 1.1) Check if has valid branch
         checkout_res = subprocess.run(
             ['git', '-C', folder, 'checkout', branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
-        if checkout_res.returncode != 0:
+        if checkout_res.returncode != 0: # 1.2) If no / wrong branch
             create_res = subprocess.run(
                 ['git', '-C', folder, 'checkout', '-b', branch],
                 capture_output=True, text=True, creationflags=startup_flags
@@ -372,63 +347,60 @@ def push_to_github():
                 messagebox.showerror("Git Error", f"Could not switch to branch '{branch}':\n{checkout_res.stderr}")
                 return
             else:
-                set_status(f"✅ CREATED & SWITCHED TO BRANCH: {branch}")
+                set_status(f"CREATED & SWITCHED TO BRANCH: {branch}")
         else:
-            set_status(f"✅ SWITCHED TO BRANCH: {branch}")
+            set_status(f"SWITCHED TO BRANCH: {branch}")
 
-        # Check for uncommitted changes
+        # 2.1) Check for uncommitted changes
         status = subprocess.run(
             ['git', '-C', folder, 'status', '--porcelain'],
             capture_output=True, text=True, creationflags=startup_flags
         )
-        if status.stdout.strip():
+        if status.stdout.strip():  # 2.2) If has uncommitted changes
             messagebox.showerror("Push Blocked", "Uncommitted changes detected! Please commit them first.")
             return
 
-        # Check if needs pushing
+        # 3.1) Check if needs pushing
         check_push = subprocess.run(
             ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
             capture_output=True, text=True, creationflags=startup_flags
         )
-        if not check_push.stdout.strip():
+        if not check_push.stdout.strip(): # 3.2) If no push needed
             messagebox.showinfo("Push Status", "Everything is already up to date!")
             set_status("EVERYTHING UP TO DATE")
             return
 
-        set_status("PUSHING TO GITHUB...")
+        # 3.3) If needs pushing && can push
+        set_status("PUSHING...")
         result = subprocess.run(
             ['git', '-C', folder, 'push', '-u', 'origin', branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
-
-        if result.returncode == 0:
+        if result.returncode == 0: # 3.4) Success
             app_state.save_history(folder)
-            set_status("✅ REPOSITORY UPDATED")
-            messagebox.showinfo("Success", "Push successful!")
+            set_status("REPOSITORY UPDATED")
+            messagebox.showinfo("Success", "Commits have been pushed!")
         else:
             if "rejected" in result.stderr.lower():
-                messagebox.showerror("Push Failed", "Remote has new commits!\n\nClick 'Pull Latest' first, then try pushing again.")
-                set_status("PUSH REJECTED - NEED PULL")
+                messagebox.showerror("Push Failed", "Remote has new commits!\n\nClick 'PULL' first, then try pushing again.")
+                set_status("PUSH REJECTED > NEED PULL")
             else:
                 messagebox.showerror("Push Failed", result.stderr)
                 set_status("PUSH FAILED")
-
     except Exception as e:
         messagebox.showerror("Error", str(e))
-
     finally:
         update_btns("normal")
         validate_fields()
 
 def pull_from_github():
-    """Pull latest changes from GitHub"""
+    """Pull"""
     folder = folder_var.get().strip()
     branch = branch_var.get().strip() or "main"
 
     if not folder:
-        messagebox.showwarning("Input", "Please enter a folder path!")
+        messagebox.showwarning("Input", "Please enter a folder path.")
         return
-
     if not validate_environment(folder):
         return
 
@@ -436,15 +408,15 @@ def pull_from_github():
     set_status(f"PULLING FROM {branch}...")
 
     try:
+        # 1.1) Check if can pull
         result = subprocess.run(
             ['git', '-C', folder, 'pull', 'origin', branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
-
-        if result.returncode == 0:
+        if result.returncode == 0: # 1.2) Success
             app_state.save_history(folder)
-            set_status("✅ PULL SUCCESSFUL")
-            messagebox.showinfo("Success", f"Latest changes pulled successfully from '{branch}'!")
+            set_status("PULL SUCCESSFUL")
+            messagebox.showinfo("Success", f"Latest changes pulled from '{branch}'!")
         else:
             if "no such remote" in result.stderr.lower():
                 messagebox.showerror("Pull Failed", "No remote 'origin' found. Initialize the repo first.")
@@ -452,10 +424,8 @@ def pull_from_github():
             else:
                 messagebox.showerror("Pull Failed", result.stderr)
                 set_status("PULL FAILED")
-
     except Exception as e:
         messagebox.showerror("Error", str(e))
-
     finally:
         update_btns("normal")
         validate_fields()
@@ -467,9 +437,7 @@ def set_folder(path):
         app_state.save_history(path)
         validate_fields()
 
-# ======================================================================================================================
-# INTERFACE
-# ======================================================================================================================
+# INTERFACE ############################################################################################################
 
 # Base
 root = tk.Tk()
