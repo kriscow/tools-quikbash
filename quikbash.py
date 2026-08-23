@@ -141,7 +141,7 @@ def init_new_repo():
                 messagebox.showerror("Git Error", f"Failed to link: {result.stderr}")
                 return
 
-        # 2) Add / Stage all files
+        # 2) Add all files
         result = subprocess.run(
             ['git', '-C', folder, 'add', '.'],
             capture_output=True, text=True, creationflags=startup_flags
@@ -477,30 +477,29 @@ style.map("TCombobox",
           selectforeground=[("!disabled", white)])
 # Status Text
 style.configure("Status.TLabel", background=white, foreground=dark, padding=10)
-
 # Entry Vars
 folder_var = tk.StringVar()
 url_var = tk.StringVar()
 branch_var = tk.StringVar()
 msg_var = tk.StringVar()
 
-# Smart Enabling
+# Button State
 folder_var.trace_add("write", validate_fields)
 url_var.trace_add("write", validate_fields)
 msg_var.trace_add("write", validate_fields)
 
-# Folder Path UI
+# Folder Path
 ttk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(20, 0))
 folder_entry = ttk.Combobox(root, width=50, textvariable=folder_var)
 folder_entry.pack(pady=(5, 30), padx=20, fill=tk.X)
 folder_entry['values'] = app_state.history
 
-# Tab Control
+# Tab Setup
 tab_control = ttk.Notebook(root)
 tab1 = ttk.Frame(tab_control, padding=10)
 tab2 = ttk.Frame(tab_control, padding=10)
-tab_control.add(tab1, text="New Repository")
-tab_control.add(tab2, text="Update Repository")
+tab_control.add(tab1, text="INITIALIZE")
+tab_control.add(tab2, text="STAGE")
 tab_control.pack(expand=True, fill="both", padx=10)
 
 # Tab 1 (New Repo)
@@ -528,13 +527,10 @@ button_frame.columnconfigure(1, weight=1, uniform="a")
 
 anc_button = ttk.Button(button_frame, text="COMMIT", command=lambda: run_async(commit_changes), state="disabled")
 anc_button.grid(row=0, column=0, padx=(0, 5), pady=(0, 5), sticky="ew")
-
 push_button = ttk.Button(button_frame, text="PUSH", command=lambda: run_async(push_to_github), state="disabled")
 push_button.grid(row=0, column=1, padx=(5, 0), pady=(0, 5), sticky="ew")
-
 sync_button = ttk.Button(button_frame, text="COMMIT & PUSH", command=lambda: run_async(do_all), state="disabled")
 sync_button.grid(row=1, column=0, padx=(0, 5), pady=(5, 0), sticky="ew")
-
 pull_button = ttk.Button(button_frame, text="PULL", command=lambda: run_async(pull_from_github), state="disabled")
 pull_button.grid(row=1, column=1, padx=(5, 0), pady=(5, 0), sticky="ew")
 
@@ -545,7 +541,5 @@ status_var = tk.StringVar(value="READY")
 status_label = ttk.Label(status_frame, textvariable=status_var, style="Status.TLabel", anchor="center", font=('Arial', 9, 'bold'))
 status_label.pack(fill=tk.X, padx=10, pady=(0, 3))
 
-# Initialize validation
 validate_fields()
-
 root.mainloop()
