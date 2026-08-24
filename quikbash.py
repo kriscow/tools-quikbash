@@ -21,6 +21,7 @@ class AppState:
     def __init__(self):
         self.history = []
         self.load_history()
+        self.is_processing = False
 
     def load_history(self):
         """Load saved repo path"""
@@ -111,6 +112,25 @@ def update_btns(state):
 def set_status(text):
     update_sts(status_var.set, value=text)
 
+def set_processing(active, status_txt="PROCESSING"):
+    app_state.is_processing = active
+
+    if active:
+        update_btns("disabled")
+        anim_status(status_txt)
+    else:
+        update_btns("normal")
+        set_status("READY")
+        validate_fields()
+
+def anim_status(base, dot_count=0):
+    dots = [".", "..", "..."]
+    idx = dot_count % len(dots)
+    set_status(f"{base}{dots[idx]}")
+
+    if app_state.is_processing:
+        root.after(500, lambda: anim_status(base, dot_count + 1))
+
 # COMMANDS #############################################################################################################
 
 def init_new_repo():
@@ -123,7 +143,7 @@ def init_new_repo():
         return
 
     update_btns("disabled")
-    set_status("Processing...")
+    set_processing(True, status_txt="INITIALIZING")
 
     try:
         # 1.1) Check if has valid local
@@ -230,8 +250,7 @@ def init_new_repo():
     except Exception as e:
         messagebox.showerror("Error", str(e))
     finally:
-        update_btns("normal")
-        validate_fields()
+        set_processing(False)
 
 def do_all():
     """Add > Commit > Push"""
@@ -243,8 +262,7 @@ def do_all():
         messagebox.showwarning("Input", "Please fill up all entry fields.")
         return
 
-    update_btns("disabled")
-    set_status("Checking for unpushed commits...")
+    set_processing(True, status_txt="CHECKING UNPUSHED COMMITS")
 
     try:
         # 1) Check unpushed commits
@@ -275,8 +293,7 @@ def do_all():
     except Exception as e:
         messagebox.showerror("Error", str(e))
     finally:
-        update_btns("normal")
-        validate_fields()
+        set_processing(False)
 
 def commit_changes():
     """Add > Commit"""
@@ -289,8 +306,7 @@ def commit_changes():
     if not validate_environment(folder):
         return
 
-    update_btns("disabled")
-    set_status("Checking for changes...")
+    set_processing(True, status_txt="CHECKING CHANGES")
 
     try:
         # 1.1) Check for content changes
@@ -319,8 +335,7 @@ def commit_changes():
     except Exception as e:
         messagebox.showerror("Error", str(e))
     finally:
-        update_btns("normal")
-        validate_fields()
+        set_processing(False)
 
 def push_to_github():
     """Push"""
@@ -329,8 +344,7 @@ def push_to_github():
 
     if not validate_environment(folder): return
 
-    update_btns("disabled")
-    set_status(f"Checking {branch}...")
+    set_processing(True, status_txt=f"CHECKING {branch}")
 
     try:
         # 1.1) Check if has valid branch
@@ -390,8 +404,7 @@ def push_to_github():
     except Exception as e:
         messagebox.showerror("Error", str(e))
     finally:
-        update_btns("normal")
-        validate_fields()
+        set_processing(False)
 
 def pull_from_github():
     """Pull"""
@@ -404,8 +417,7 @@ def pull_from_github():
     if not validate_environment(folder):
         return
 
-    update_btns("disabled")
-    set_status(f"PULLING FROM {branch}...")
+    set_processing(True, status_txt=f"PULLING FROM {branch}")
 
     try:
         # 1.1) Check if can pull
@@ -427,8 +439,7 @@ def pull_from_github():
     except Exception as e:
         messagebox.showerror("Error", str(e))
     finally:
-        update_btns("normal")
-        validate_fields()
+        set_processing(False)
 
 def set_folder(path):
     """Set folder from history chip"""
@@ -498,8 +509,8 @@ folder_entry['values'] = app_state.history
 tab_control = ttk.Notebook(root)
 tab1 = ttk.Frame(tab_control, padding=10)
 tab2 = ttk.Frame(tab_control, padding=10)
-tab_control.add(tab1, text="INITIALIZE")
-tab_control.add(tab2, text="STAGE")
+tab_control.add(tab1, text="SETUP")
+tab_control.add(tab2, text="WORK")
 tab_control.pack(expand=True, fill="both", padx=10)
 
 # Tab 1 (New Repo)
