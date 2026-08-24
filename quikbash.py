@@ -328,7 +328,7 @@ def commit_changes(silent=False):
         )
         if not status.stdout.strip(): # 1.2) If no content changes
             if not silent:
-                messagebox.showinfo("Status", "No changes detected.\n\nGit doesn't track empty folders.")
+                messagebox.showinfo("Status", "No changes to commit.")
             set_status("NO CHANGES")
             return
 
