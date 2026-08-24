@@ -274,7 +274,7 @@ def do_all():
 
         if has_unpushed:
             set_status("Found unpushed commits - pushing...")
-            push_to_github()
+            push_to_github(silent=True)
             return
 
         # 2.1) Check uncommitted changes
@@ -285,7 +285,7 @@ def do_all():
         if status.stdout.strip(): # 2.2) If has uncommitted changes
             commit_changes(silent=True)
             set_status("PUSHING...")
-            push_to_github()
+            push_to_github(silent=True)
         else:
             messagebox.showinfo("Status", "No changes detected.")
             set_status("EVERYTHING IS UP TO DATE")
@@ -336,7 +336,7 @@ def commit_changes(silent=False):
         if not silent:
             messagebox.showerror("Error", str(e))
 
-def push_to_github():
+def push_to_github(silent=False):
     """Push"""
     folder = folder_var.get().strip()
     branch = branch_var.get().strip() or "main"
@@ -355,10 +355,12 @@ def push_to_github():
                 capture_output=True, text=True, creationflags=startup_flags
             )
             if create_res.returncode != 0:
-                messagebox.showerror("Git Error", f"Could not switch to branch '{branch}':\n{checkout_res.stderr}")
+                if not silent:
+                    messagebox.showerror("Git Error", f"Could not switch to branch '{branch}':\n{checkout_res.stderr}")
                 return
             else:
-                set_status(f"CREATED & SWITCHED TO BRANCH: {branch}")
+                if not silent:
+                    set_status(f"CREATED & SWITCHED TO BRANCH: {branch}")
         else:
             set_status(f"SWITCHED TO BRANCH: {branch}")
 
@@ -368,7 +370,8 @@ def push_to_github():
             capture_output=True, text=True, creationflags=startup_flags
         )
         if status.stdout.strip():  # 2.2) If has uncommitted changes
-            messagebox.showerror("Push Blocked", "Uncommitted changes detected! Please commit them first.")
+            if not silent:
+                messagebox.showerror("Push Blocked", "Uncommitted changes detected! Please commit them first.")
             return
 
         # 3.1) Check if needs pushing
@@ -377,7 +380,8 @@ def push_to_github():
             capture_output=True, text=True, creationflags=startup_flags
         )
         if not check_push.stdout.strip(): # 3.2) If no push needed
-            messagebox.showinfo("Push Status", "Everything is already up to date!")
+            if not silent:
+                messagebox.showinfo("Push Status", "Everything is already up to date!")
             set_status("EVERYTHING UP TO DATE")
             return
 
@@ -389,15 +393,18 @@ def push_to_github():
         )
         if result.returncode == 0: # 3.4) Success
             app_state.save_history(folder)
-            set_status("REPOSITORY UPDATED")
-            messagebox.showinfo("Success", "Commits have been pushed!")
+            if not silent:
+                set_status("REPOSITORY UPDATED")
+                messagebox.showinfo("Success", "Commits have been pushed!")
         else:
             if "rejected" in result.stderr.lower():
-                messagebox.showerror("Push Failed", "Remote has new commits!\n\nClick 'PULL' first, then try pushing again.")
-                set_status("PUSH REJECTED > NEED PULL")
+                if not silent:
+                    messagebox.showerror("Push Failed", "Remote has new commits!\n\nClick 'PULL' first, then try pushing again.")
+                    set_status("PUSH REJECTED > NEED PULL")
             else:
-                messagebox.showerror("Push Failed", result.stderr)
-                set_status("PUSH FAILED")
+                if not silent:
+                    messagebox.showerror("Push Failed", result.stderr)
+                    set_status("PUSH FAILED")
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
