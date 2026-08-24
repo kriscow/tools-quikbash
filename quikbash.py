@@ -283,7 +283,7 @@ def do_all():
             capture_output=True, text=True, creationflags=startup_flags
         )
         if status.stdout.strip(): # 2.2) If has uncommitted changes
-            commit_changes()
+            commit_changes(silent=True)
             set_status("PUSHING...")
             push_to_github()
         else:
@@ -294,7 +294,7 @@ def do_all():
     finally:
         set_processing(False)
 
-def commit_changes():
+def commit_changes(silent=False):
     """Add > Commit"""
     folder = folder_var.get().strip()
     msg = msg_var.get().strip()
@@ -312,7 +312,8 @@ def commit_changes():
             capture_output=True, text=True, creationflags=startup_flags
         )
         if not status.stdout.strip(): # 1.2) If no content changes
-            messagebox.showinfo("Status", "No changes detected.\n\nGit doesn't track empty folders.")
+            if not silent:
+                messagebox.showinfo("Status", "No changes detected.\n\nGit doesn't track empty folders.")
             set_status("NO CHANGES")
             return
 
