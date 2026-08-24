@@ -114,7 +114,6 @@ def set_status(text):
 
 def set_processing(active, status_txt="PROCESSING"):
     app_state.is_processing = active
-
     if active:
         update_btns("disabled")
         anim_status(status_txt)
@@ -124,12 +123,11 @@ def set_processing(active, status_txt="PROCESSING"):
         validate_fields()
 
 def anim_status(base, dot_count=0):
+    if not app_state.is_processing: return
     dots = [".", "..", "..."]
     idx = dot_count % len(dots)
     set_status(f"{base}{dots[idx]}")
-
-    if app_state.is_processing:
-        root.after(500, lambda: anim_status(base, dot_count + 1))
+    root.after(500, lambda: anim_status(base, dot_count + 1))
 
 # COMMANDS #############################################################################################################
 
