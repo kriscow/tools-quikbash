@@ -443,6 +443,29 @@ def pull_from_github():
     if not validate_environment(folder):
         return
 
+    status = subprocess.run(
+        ['git', '-C', folder, 'status', '--porcelain'],
+        capture_output=True, text=True, creationflags=startup_flags)
+    if status.stdout.strip():
+        confirm = messagebox.askyesno(
+            "Uncommitted Changes Detected",
+            "You have uncommitted changes.\n"
+            "Pulling may cause conflicts.\n\n"
+            "Continue anyway?"
+        )
+        if not confirm:
+            set_status("PULL CANCELLED")
+            return
+    else:
+        confirm = messagebox.askyesno(
+            "Confirmation",
+            f"Pull latest from {branch}?\n\n"
+            "This will download and merge changes from the remote.\n")
+
+        if not confirm:
+            set_status("PULL CANCELLED")
+            return
+
     set_processing(True, status_txt=f"PULLING FROM {branch}")
     timer_start = start_timer()
 
