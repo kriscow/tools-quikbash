@@ -327,11 +327,14 @@ def commit_changes(silent=False):
         if result.returncode == 0:
             app_state.save_history(folder)
             set_status("READY TO PUSH")
-            messagebox.showinfo("Success", "Changes have been committed!")
+            if not silent:
+                messagebox.showinfo("Success", "Changes have been committed!")
         else:
-            messagebox.showerror("Git Error", result.stderr)
+            if not silent:
+                messagebox.showerror("Git Error", result.stderr)
     except Exception as e:
-        messagebox.showerror("Error", str(e))
+        if not silent:
+            messagebox.showerror("Error", str(e))
 
 def push_to_github():
     """Push"""
