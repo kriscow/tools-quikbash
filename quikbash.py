@@ -540,6 +540,7 @@ style.map("TCombobox",
           selectforeground=[("!disabled", white)])
 # Status Text
 style.configure("Status.TLabel", background=white, foreground=dark, padding=10)
+
 # Entry Vars
 folder_var = tk.StringVar()
 url_var = tk.StringVar()
