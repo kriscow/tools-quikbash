@@ -275,6 +275,7 @@ def do_all():
         if has_unpushed:
             set_status("Found unpushed commits - pushing...")
             push_to_github(silent=True)
+            messagebox.showinfo("Success", "Commits have been pushed!")
             return
 
         # 2.1) Check uncommitted changes
@@ -384,7 +385,7 @@ def push_to_github(silent=False):
         if not check_push.stdout.strip(): # 3.2) If no push needed
             if not silent:
                 messagebox.showinfo("Push Status", "Everything is already up to date!")
-            set_status("EVERYTHING UP TO DATE")
+                set_status("EVERYTHING UP TO DATE")
             return
 
         # 3.3) If needs pushing && can push
