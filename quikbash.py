@@ -306,8 +306,6 @@ def commit_changes():
     if not validate_environment(folder):
         return
 
-    set_processing(True, status_txt="CHECKING CHANGES")
-
     try:
         # 1.1) Check for content changes
         status = subprocess.run(
@@ -334,8 +332,6 @@ def commit_changes():
             messagebox.showerror("Git Error", result.stderr)
     except Exception as e:
         messagebox.showerror("Error", str(e))
-    finally:
-        set_processing(False)
 
 def push_to_github():
     """Push"""
@@ -343,8 +339,6 @@ def push_to_github():
     branch = branch_var.get().strip() or "main"
 
     if not validate_environment(folder): return
-
-    set_processing(True, status_txt=f"CHECKING {branch}")
 
     try:
         # 1.1) Check if has valid branch
@@ -403,8 +397,6 @@ def push_to_github():
                 set_status("PUSH FAILED")
     except Exception as e:
         messagebox.showerror("Error", str(e))
-    finally:
-        set_processing(False)
 
 def pull_from_github():
     """Pull"""
