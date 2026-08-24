@@ -284,9 +284,8 @@ def do_all():
         )
         if status.stdout.strip(): # 2.2) If has uncommitted changes
             commit_changes()
-            if status_var.get() == "READY TO PUSH":
-                set_status("PUSHING...")
-                push_to_github()
+            set_status("PUSHING...")
+            push_to_github()
         else:
             messagebox.showinfo("Status", "No changes detected.")
             set_status("EVERYTHING IS UP TO DATE")
