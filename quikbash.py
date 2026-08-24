@@ -282,9 +282,9 @@ def do_all():
         has_unpushed = bool(check_push.stdout.strip())
 
         if has_unpushed:
-            set_status("Found unpushed commits - pushing...")
             push_to_github(silent=True)
             elapsed = end_timer(timer_start)
+            set_status("Found unpushed commits - pushing...")
             messagebox.showinfo("Success", f"Commits have been pushed!\n\nProcess finished in {elapsed}.")
             return
 
@@ -295,13 +295,13 @@ def do_all():
         )
         if status.stdout.strip(): # 2.2) If has uncommitted changes
             commit_changes(silent=True)
-            set_status("PUSHING...")
             push_to_github(silent=True)
             elapsed = end_timer(timer_start)
+            set_status("PUSHING...")
             messagebox.showinfo("Success", f"Changes have been committed and pushed!\n\nProcess finished in {elapsed}.")
         else:
-            messagebox.showinfo("Status", "No changes detected.")
             set_status("EVERYTHING IS UP TO DATE")
+            messagebox.showinfo("Status", "No changes detected.")
     except Exception as e:
         messagebox.showerror("Error", str(e))
     finally:
@@ -402,9 +402,8 @@ def push_to_github(silent=False):
         )
         if not check_push.stdout.strip(): # 3.2) If no push needed
             if not silent:
-                elapsed = end_timer(timer_start)
-                messagebox.showinfo("Push Status", f"Everything is already up to date!\n\nProcess finished in {elapsed}.")
                 set_status("EVERYTHING UP TO DATE")
+                messagebox.showinfo("Push Status", "Everything is already up to date!")
             return
 
         # 3.3) If needs pushing && can push
@@ -424,12 +423,12 @@ def push_to_github(silent=False):
         else:
             if "rejected" in result.stderr.lower():
                 if not silent:
+                    set_status("PUSH REJECTED > NEED TO PULL")
                     messagebox.showerror("Push Failed", "Remote has new commits!\n\nClick 'PULL' first, then try pushing again.")
-                    set_status("PUSH REJECTED > NEED PULL")
             else:
                 if not silent:
-                    messagebox.showerror("Push Failed", result.stderr)
                     set_status("PUSH FAILED")
+                    messagebox.showerror("Push Failed", result.stderr)
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
@@ -460,11 +459,11 @@ def pull_from_github():
             messagebox.showinfo("Success", f"Latest changes pulled from '{branch}'!\n\nProcess finished in {elapsed}.")
         else:
             if "no such remote" in result.stderr.lower():
-                messagebox.showerror("Pull Failed", "No remote 'origin' found. Initialize the repo first.")
                 set_status("NO REMOTE FOUND")
+                messagebox.showerror("Pull Failed", "No remote 'origin' found. Initialize the repo first.")
             else:
-                messagebox.showerror("Pull Failed", result.stderr)
                 set_status("PULL FAILED")
+                messagebox.showerror("Pull Failed", result.stderr)
     except Exception as e:
         elapsed = end_timer(timer_start)
         messagebox.showerror("Error", str(e))
