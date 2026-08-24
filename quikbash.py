@@ -1,8 +1,9 @@
+import os
+import time
+import threading
+import subprocess
 import tkinter as tk
 from tkinter import messagebox, ttk
-import os
-import subprocess
-import threading
 
 # Global Variables
 h_file = "qb_history.txt"
@@ -129,6 +130,14 @@ def anim_status(base, dot_count=0):
     set_status(f"{base}{dots[idx]}")
     root.after(500, lambda: anim_status(base, dot_count + 1))
 
+def start_timer():
+    return time.perf_counter()
+
+def end_timer(start_time):
+    elapsed = time.perf_counter() - start_time
+    if elapsed < 1: return f"{elapsed*1000:.0f}ms"
+    else: return f"{elapsed:.2f}s"
+
 # COMMANDS #############################################################################################################
 
 def init_new_repo():
@@ -140,8 +149,8 @@ def init_new_repo():
         messagebox.showwarning("Input", "Please fill up all required fields.")
         return
 
-    update_btns("disabled")
     set_processing(True, status_txt="INITIALIZING")
+    timer_start = start_timer()
 
     try:
         # 1.1) Check if has valid local
@@ -243,8 +252,9 @@ def init_new_repo():
             return
 
         app_state.save_history(folder)
+        elapsed = end_timer(timer_start)
         set_status("INITIALIZE SUCCESS")
-        messagebox.showinfo("Success", "Initialization finished!")
+        messagebox.showinfo("Success", f"Initialization finished!\n\nProcess finished in {elapsed}.")
     except Exception as e:
         messagebox.showerror("Error", str(e))
     finally:
@@ -261,6 +271,7 @@ def do_all():
         return
 
     set_processing(True, status_txt="CHECKING UNPUSHED COMMITS")
+    timer_start = start_timer()
 
     try:
         # 1) Check unpushed commits
@@ -273,7 +284,8 @@ def do_all():
         if has_unpushed:
             set_status("Found unpushed commits - pushing...")
             push_to_github(silent=True)
-            messagebox.showinfo("Success", "Commits have been pushed!")
+            elapsed = end_timer(timer_start)
+            messagebox.showinfo("Success", f"Commits have been pushed!\n\nProcess finished in {elapsed}.")
             return
 
         # 2.1) Check uncommitted changes
@@ -285,7 +297,8 @@ def do_all():
             commit_changes(silent=True)
             set_status("PUSHING...")
             push_to_github(silent=True)
-            messagebox.showinfo("Success", "Changes have been committed and pushed!")
+            elapsed = end_timer(timer_start)
+            messagebox.showinfo("Success", f"Changes have been committed and pushed!\n\nProcess finished in {elapsed}.")
         else:
             messagebox.showinfo("Status", "No changes detected.")
             set_status("EVERYTHING IS UP TO DATE")
@@ -304,6 +317,8 @@ def commit_changes(silent=False):
         return
     if not validate_environment(folder):
         return
+
+    timer_start = start_timer()
 
     try:
         # 1.1) Check for content changes
@@ -328,12 +343,15 @@ def commit_changes(silent=False):
             app_state.save_history(folder)
             set_status("READY TO PUSH")
             if not silent:
-                messagebox.showinfo("Success", "Changes have been committed!")
+                elapsed = end_timer(timer_start)
+                messagebox.showinfo("Success", f"Changes have been committed!\n\nProcess finished in {elapsed}.")
         else:
             if not silent:
+                elapsed = end_timer(timer_start)
                 messagebox.showerror("Git Error", result.stderr)
     except Exception as e:
         if not silent:
+            elapsed = end_timer(timer_start)
             messagebox.showerror("Error", str(e))
 
 def push_to_github(silent=False):
@@ -342,6 +360,7 @@ def push_to_github(silent=False):
     branch = branch_var.get().strip() or "main"
 
     if not validate_environment(folder): return
+    timer_start = start_timer()
 
     try:
         # 1.1) Check if has valid branch
@@ -372,7 +391,8 @@ def push_to_github(silent=False):
         )
         if status.stdout.strip():  # 2.2) If has uncommitted changes
             if not silent:
-                messagebox.showerror("Push Blocked", "Uncommitted changes detected! Please commit them first.")
+                elapsed = end_timer(timer_start)
+                messagebox.showerror("Push Blocked", f"Uncommitted changes detected! Please commit them first.\n\nProcess finished in {elapsed}.")
             return
 
         # 3.1) Check if needs pushing
@@ -382,7 +402,8 @@ def push_to_github(silent=False):
         )
         if not check_push.stdout.strip(): # 3.2) If no push needed
             if not silent:
-                messagebox.showinfo("Push Status", "Everything is already up to date!")
+                elapsed = end_timer(timer_start)
+                messagebox.showinfo("Push Status", f"Everything is already up to date!\n\nProcess finished in {elapsed}.")
                 set_status("EVERYTHING UP TO DATE")
             return
 
@@ -397,8 +418,9 @@ def push_to_github(silent=False):
         if result.returncode == 0: # 3.4) Success
             app_state.save_history(folder)
             if not silent:
+                elapsed = end_timer(timer_start)
                 set_status("REPOSITORY UPDATED")
-                messagebox.showinfo("Success", "Commits have been pushed!")
+                messagebox.showinfo("Success", f"Commits have been pushed!\n\nProcess finished in {elapsed}.")
         else:
             if "rejected" in result.stderr.lower():
                 if not silent:
@@ -423,6 +445,7 @@ def pull_from_github():
         return
 
     set_processing(True, status_txt=f"PULLING FROM {branch}")
+    timer_start = start_timer()
 
     try:
         # 1.1) Check if can pull
@@ -432,8 +455,9 @@ def pull_from_github():
         )
         if result.returncode == 0: # 1.2) Success
             app_state.save_history(folder)
+            elapsed = end_timer(timer_start)
             set_status("PULL SUCCESSFUL")
-            messagebox.showinfo("Success", f"Latest changes pulled from '{branch}'!")
+            messagebox.showinfo("Success", f"Latest changes pulled from '{branch}'!\n\nProcess finished in {elapsed}.")
         else:
             if "no such remote" in result.stderr.lower():
                 messagebox.showerror("Pull Failed", "No remote 'origin' found. Initialize the repo first.")
@@ -442,6 +466,7 @@ def pull_from_github():
                 messagebox.showerror("Pull Failed", result.stderr)
                 set_status("PULL FAILED")
     except Exception as e:
+        elapsed = end_timer(timer_start)
         messagebox.showerror("Error", str(e))
     finally:
         set_processing(False)
