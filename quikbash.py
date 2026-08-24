@@ -286,6 +286,7 @@ def do_all():
             commit_changes(silent=True)
             set_status("PUSHING...")
             push_to_github(silent=True)
+            messagebox.showinfo("Success", "Changes have been committed and pushed!")
         else:
             messagebox.showinfo("Status", "No changes detected.")
             set_status("EVERYTHING IS UP TO DATE")
@@ -362,7 +363,8 @@ def push_to_github(silent=False):
                 if not silent:
                     set_status(f"CREATED & SWITCHED TO BRANCH: {branch}")
         else:
-            set_status(f"SWITCHED TO BRANCH: {branch}")
+            if not silent:
+                set_status(f"SWITCHED TO BRANCH: {branch}")
 
         # 2.1) Check for uncommitted changes
         status = subprocess.run(
@@ -386,7 +388,9 @@ def push_to_github(silent=False):
             return
 
         # 3.3) If needs pushing && can push
-        set_status("PUSHING...")
+        if not silent:
+            set_status("PUSHING...")
+
         result = subprocess.run(
             ['git', '-C', folder, 'push', '-u', 'origin', branch],
             capture_output=True, text=True, creationflags=startup_flags
