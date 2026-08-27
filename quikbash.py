@@ -370,7 +370,7 @@ def push_to_github(silent=False):
         )
         local_branch = (local_branch_check.returncode == 0)
 
-        if not local_branch: # 1.2) If no local branch
+        if not local_branch:
             if not silent:
                 set_status(f"CREATING BRANCH: {branch}")
             create_res = subprocess.run(
@@ -380,16 +380,16 @@ def push_to_github(silent=False):
             if create_res.returncode != 0:
                 if not silent:
                     messagebox.showerror("Git Error", f"Could not create branch '{branch}':\n{create_res.stderr}")
-                    return
+                return
             if not silent:
                 set_status(f"CREATED BRANCH: {branch}")
 
-        # 2.1) Check if has valid branch
+        # 2.1) Switch to branch
         checkout_res = subprocess.run(
             ['git', '-C', folder, 'checkout', branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
-        if checkout_res.returncode != 0: # 1.2) If no / wrong branch
+        if checkout_res.returncode != 0:
             create_res = subprocess.run(
                 ['git', '-C', folder, 'checkout', '-b', branch],
                 capture_output=True, text=True, creationflags=startup_flags
@@ -410,20 +410,21 @@ def push_to_github(silent=False):
             ['git', '-C', folder, 'status', '--porcelain'],
             capture_output=True, text=True, creationflags=startup_flags
         )
-        if status.stdout.strip():  # 2.2) If has uncommitted changes
+        if status.stdout.strip():
             if not silent:
                 elapsed = end_timer(timer_start)
                 messagebox.showerror("Push Blocked", f"Uncommitted changes detected! Please commit them first.\n\nProcess finished in {elapsed}.")
             return
 
-        # 4.1) Check if has remote branch
+        # 4.1) Check if remote branch exists
         remote_branch_check = subprocess.run(
             ['git', '-C', folder, 'ls-remote', 'origin', branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
-        remote_branch = bool(remote_branch_check.stdout.strip())
+        remote_branch_exists = bool(remote_branch_check.stdout.strip())
 
-        if remote_branch:
+        # 4.2) If remote exists, check if there's anything to push
+        if remote_branch_exists:
             check_push = subprocess.run(
                 ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
                 capture_output=True, text=True, creationflags=startup_flags
@@ -433,33 +434,38 @@ def push_to_github(silent=False):
                     set_status("EVERYTHING UP TO DATE")
                     messagebox.showinfo("Push Status", "Everything is already up to date!")
                 return
+        else:
+            # New remote branch - always push
+            if not silent:
+                set_status(f"NEW REMOTE BRANCH: {branch}")
+
+        # 5) Push
+        if not silent:
+            set_status("PUSHING...")
+
+        result = subprocess.run(
+            ['git', '-C', folder, 'push', '-u', 'origin', branch],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+
+        if result.returncode == 0:
+            app_state.save_history(folder)
+            if not silent:
+                elapsed = end_timer(timer_start)
+                set_status("REPOSITORY UPDATED")
+                messagebox.showinfo("Success", f"Commits have been pushed!\n\nProcess finished in {elapsed}.")
+        else:
+            if "rejected" in result.stderr.lower():
+                if not silent:
+                    set_status("PUSH REJECTED > NEED TO PULL")
+                    messagebox.showerror("Push Failed", "Remote has new commits!\n\nClick 'PULL' first, then try pushing again.")
             else:
                 if not silent:
-                    set_status(f"NEW REMOTE BRANCH: {branch}")
-
-            if not silent and remote_branch:
-                set_status("PUSHING...")
-                result = subprocess.run(
-                    ['git', '-C', folder, 'push', '-u', 'origin', branch],
-                    capture_output=True, text=True, creationflags=startup_flags
-                )
-                if result.returncode == 0: # Success
-                    app_state.save_history(folder)
-                    if not silent:
-                        elapsed = end_timer(timer_start)
-                        set_status("REPOSITORY UPDATED")
-                        messagebox.showinfo("Sucess", f"Commits have been pushed!\n\nProcess finished in {elapsed}.")
-                else:
-                    if "rejected" in result.stderr.lower():
-                        if not silent:
-                            set_status("PUSH REJECTED > NEED TO PULL")
-                            messagebox.showerror("Push Failed", "Remote has new commits!\n\nClick 'PULL' first, then try pushing again.")
-                    else:
-                        if not silent:
-                            set_status("PUSH FAILED")
-                            messagebox.showerror("Push Failed", result.stderr)
+                    set_status("PUSH FAILED")
+                    messagebox.showerror("Push Failed", result.stderr)
     except Exception as e:
-        messagebox.showerror("Error", str(e))
+        if not silent:
+            messagebox.showerror("Error", str(e))
 
 def pull_from_github():
     """Pull"""
