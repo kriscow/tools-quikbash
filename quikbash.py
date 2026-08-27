@@ -87,7 +87,7 @@ def validate_environment(folder_name, check_git=True):
             capture_output=True, text=True, creationflags=startup_flags
         )
         if result.returncode != 0:
-            messagebox.showerror("Error", "Not a Git repository. Initialize/Re-Link it first.")
+            messagebox.showerror("Error", "Not a Git repository. Link it first.")
             return False
     return True
 
@@ -95,7 +95,7 @@ def update_init_button_label():
     """Update init / re-link button label (history-based)"""
     folder = folder_var.get().strip()
     if folder and app_state.is_in_history(folder): init_button.config(text="RE-LINK")
-    else: init_button.config(text="INITIALIZE")
+    else: init_button.config(text="LINK")
 
 # HELPERS ##############################################################################################################
 
@@ -141,7 +141,7 @@ def end_timer(start_time):
 # COMMANDS #############################################################################################################
 
 def init_new_repo():
-    """Initialize / Re-Link > Push"""
+    """Link / Re-Link > Push"""
     folder = folder_var.get().strip()
     url = url_var.get().strip()
 
@@ -363,12 +363,33 @@ def push_to_github(silent=False):
     timer_start = start_timer()
 
     try:
-        # 1.1) Check if has valid branch
+        # 1.1) Check if has local branch
+        local_branch_check = subprocess.run(
+            ['git', '-C', folder, 'rev-parse', '--verify', branch],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+        local_branch = (local_branch_check.returncode == 0)
+
+        if not local_branch:
+            if not silent:
+                set_status(f"CREATING BRANCH: {branch}")
+            create_res = subprocess.run(
+                ['git', '-C', folder, 'checkout', '-b', branch],
+                capture_output=True, text=True, creationflags=startup_flags
+            )
+            if create_res.returncode != 0:
+                if not silent:
+                    messagebox.showerror("Git Error", f"Could not create branch '{branch}':\n{create_res.stderr}")
+                return
+            if not silent:
+                set_status(f"CREATED BRANCH: {branch}")
+
+        # 2.1) Switch to branch
         checkout_res = subprocess.run(
             ['git', '-C', folder, 'checkout', branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
-        if checkout_res.returncode != 0: # 1.2) If no / wrong branch
+        if checkout_res.returncode != 0:
             create_res = subprocess.run(
                 ['git', '-C', folder, 'checkout', '-b', branch],
                 capture_output=True, text=True, creationflags=startup_flags
@@ -384,29 +405,41 @@ def push_to_github(silent=False):
             if not silent:
                 set_status(f"SWITCHED TO BRANCH: {branch}")
 
-        # 2.1) Check for uncommitted changes
+        # 3.1) Check for uncommitted changes
         status = subprocess.run(
             ['git', '-C', folder, 'status', '--porcelain'],
             capture_output=True, text=True, creationflags=startup_flags
         )
-        if status.stdout.strip():  # 2.2) If has uncommitted changes
+        if status.stdout.strip():
             if not silent:
                 elapsed = end_timer(timer_start)
                 messagebox.showerror("Push Blocked", f"Uncommitted changes detected! Please commit them first.\n\nProcess finished in {elapsed}.")
             return
 
-        # 3.1) Check if needs pushing
-        check_push = subprocess.run(
-            ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
+        # 4.1) Check if remote branch exists
+        remote_branch_check = subprocess.run(
+            ['git', '-C', folder, 'ls-remote', 'origin', branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
-        if not check_push.stdout.strip(): # 3.2) If no push needed
-            if not silent:
-                set_status("EVERYTHING UP TO DATE")
-                messagebox.showinfo("Push Status", "Everything is already up to date!")
-            return
+        remote_branch_exists = bool(remote_branch_check.stdout.strip())
 
-        # 3.3) If needs pushing && can push
+        # 4.2) If remote exists, check if there's anything to push
+        if remote_branch_exists:
+            check_push = subprocess.run(
+                ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
+                capture_output=True, text=True, creationflags=startup_flags
+            )
+            if not check_push.stdout.strip():
+                if not silent:
+                    set_status("EVERYTHING UP TO DATE")
+                    messagebox.showinfo("Push Status", "Everything is already up to date!")
+                return
+        else:
+            # New remote branch - always push
+            if not silent:
+                set_status(f"NEW REMOTE BRANCH: {branch}")
+
+        # 5) Push
         if not silent:
             set_status("PUSHING...")
 
@@ -414,7 +447,8 @@ def push_to_github(silent=False):
             ['git', '-C', folder, 'push', '-u', 'origin', branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
-        if result.returncode == 0: # 3.4) Success
+
+        if result.returncode == 0:
             app_state.save_history(folder)
             if not silent:
                 elapsed = end_timer(timer_start)
@@ -430,7 +464,8 @@ def push_to_github(silent=False):
                     set_status("PUSH FAILED")
                     messagebox.showerror("Push Failed", result.stderr)
     except Exception as e:
-        messagebox.showerror("Error", str(e))
+        if not silent:
+            messagebox.showerror("Error", str(e))
 
 def pull_from_github():
     """Pull"""
@@ -483,7 +518,7 @@ def pull_from_github():
         else:
             if "no such remote" in result.stderr.lower():
                 set_status("NO REMOTE FOUND")
-                messagebox.showerror("Pull Failed", "No remote 'origin' found. Initialize the repo first.")
+                messagebox.showerror("Pull Failed", "No remote 'origin' found. Link the repo first.")
             else:
                 set_status("PULL FAILED")
                 messagebox.showerror("Pull Failed", result.stderr)
@@ -571,7 +606,7 @@ ttk.Label(tab1, text="Remote URL:").pack(pady=(10, 0))
 url_entry = ttk.Entry(tab1, textvariable=url_var)
 url_entry.pack(pady=5, fill=tk.X)
 
-init_button = ttk.Button(tab1, text="INITIALIZE", command=lambda: run_async(init_new_repo), state="disabled")
+init_button = ttk.Button(tab1, text="LINK", command=lambda: run_async(init_new_repo), state="disabled")
 init_button.pack(fill=tk.X, pady=5)
 
 # Tab 2 (Update Repo)
