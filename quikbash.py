@@ -6,9 +6,11 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 # Global Variables
-h_file = "qb_history.txt"
 startup_flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+h_file = "qb_history.txt"
+b_file = "qb_branches.txt"
 MAX_HISTORY = 5
+MAX_BRANCHES = 64
 
 # Palette
 orange = "#FF7F11"
@@ -21,7 +23,9 @@ green = "#2F6B3F"
 class AppState:
     def __init__(self):
         self.history = []
+        self.branches = []
         self.load_history()
+        self.load_branches()
         self.is_processing = False
 
     def load_history(self):
@@ -40,13 +44,36 @@ class AppState:
             self.history.remove(path)
         self.history.insert(0, path)
         self.history = self.history[:MAX_HISTORY]
-
         with open(h_file, 'w') as f:
             f.write('\n'.join(self.history))
 
     def is_in_history(self, path):
         """Check if path exists in history"""
         return path in self.history
+
+    def load_branches(self):
+        """Load existing branches"""
+        if os.path.exists(b_file):
+            try:
+                with open(b_file, 'r') as f:
+                    self.branches = [line.strip() for line in f.readlines() if line.strip()]
+            except Exception:
+                self.branches = []
+        return self.branches
+
+    def save_branches(self, branch):
+        """Save new branches"""
+        if not branch or branch == "main": return
+        if branch in self.branches:
+            self.branches.remove(branch)
+        self.branches.insert(0, branch)
+        self.branches = self.branches[:MAX_BRANCHES]
+        with open(b_file, 'w') as f:
+            f.write('\n'.join(self.branches))
+
+    def is_in_branches(self, branch):
+        """Check if branch exists in repository"""
+        return branch in self.branches
 
 app_state = AppState()
 
@@ -70,10 +97,23 @@ def validate_fields(*args):
             btn.config(state="disabled")
 
     # For git (pull) command
-    if folder_var.get().strip():
+    folder = folder_var.get().strip()
+    if folder:
         pull_button.config(state="normal")
-    else:
+        if os.path.isdir(folder) and os.path.exists(os.path.join(folder, '.git')): # If folder is a valid git repo, fetch branches
+            branches = fetch_branches_from_repo(folder)
+            if branches:
+                # Merge with saved history
+                all_branches = list(set(branches + app_state.branches))
+                all_branches.sort()
+                # Keep 'main' at the top
+                if 'main' in all_branches:
+                    all_branches.remove('main')
+                    all_branches.insert(0, 'main')
+                branch_entry['values'] = all_branches
+    else: # Restore saved history if no folder
         pull_button.config(state="disabled")
+        branch_entry['values'] = app_state.branches
 
 def validate_environment(folder_name, check_git=True):
     """Folder exists && Git repo"""
@@ -144,6 +184,7 @@ def init_new_repo():
     """Link / Re-Link > Push"""
     folder = folder_var.get().strip()
     url = url_var.get().strip()
+    branch = "main"
 
     if not folder or not url:
         messagebox.showwarning("Input", "Please fill up all required fields.")
@@ -252,9 +293,18 @@ def init_new_repo():
             return
 
         app_state.save_history(folder)
+        app_state.save_branches(branch)
         elapsed = end_timer(timer_start)
         set_status("INITIALIZE SUCCESS")
         messagebox.showinfo("Success", f"Initialization finished!\n\nProcess finished in {elapsed}.")
+        branches = fetch_branches_from_repo(folder)
+        if branches:
+            all_branches = list(set(branches + app_state.branches))
+            all_branches.sort()
+            if 'main' in all_branches:
+                all_branches.remove('main')
+                all_branches.insert(0, 'main')
+            branch_entry['values'] = all_branches
     except Exception as e:
         messagebox.showerror("Error", str(e))
     finally:
@@ -283,6 +333,7 @@ def do_all():
 
         if has_unpushed:
             push_to_github(silent=True)
+            app_state.save_branches(branch)
             elapsed = end_timer(timer_start)
             set_status("Found unpushed commits - pushing...")
             messagebox.showinfo("Success", f"Commits have been pushed!\n\nProcess finished in {elapsed}.")
@@ -296,6 +347,7 @@ def do_all():
         if status.stdout.strip(): # 2.2) If has uncommitted changes
             commit_changes(silent=True)
             push_to_github(silent=True)
+            app_state.save_branches(branch)
             elapsed = end_timer(timer_start)
             set_status("PUSHING...")
             messagebox.showinfo("Success", f"Changes have been committed and pushed!\n\nProcess finished in {elapsed}.")
@@ -435,21 +487,18 @@ def push_to_github(silent=False):
                     messagebox.showinfo("Push Status", "Everything is already up to date!")
                 return
         else:
-            # New remote branch - always push
-            if not silent:
-                set_status(f"NEW REMOTE BRANCH: {branch}")
+            if not silent: set_status(f"NEW REMOTE BRANCH: {branch}")
 
         # 5) Push
-        if not silent:
-            set_status("PUSHING...")
+        if not silent: set_status("PUSHING...")
 
         result = subprocess.run(
             ['git', '-C', folder, 'push', '-u', 'origin', branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
-
         if result.returncode == 0:
             app_state.save_history(folder)
+            app_state.save_branches(branch)
             if not silent:
                 elapsed = end_timer(timer_start)
                 set_status("REPOSITORY UPDATED")
@@ -515,6 +564,15 @@ def pull_from_github():
             elapsed = end_timer(timer_start)
             set_status("PULL SUCCESSFUL")
             messagebox.showinfo("Success", f"Latest changes pulled from '{branch}'!\n\nProcess finished in {elapsed}.")
+            branches = fetch_branches_from_repo(folder)
+
+            if branches:
+                all_branches = list(set(branches + app_state.branches))
+                all_branches.sort()
+                if 'main' in all_branches:
+                    all_branches.remove('main')
+                    all_branches.insert(0, 'main')
+                branch_entry['values'] = all_branches
         else:
             if "no such remote" in result.stderr.lower():
                 set_status("NO REMOTE FOUND")
@@ -534,6 +592,32 @@ def set_folder(path):
         folder_var.set(path)
         app_state.save_history(path)
         validate_fields()
+
+# OTHER ################################################################################################################
+
+def fetch_branches_from_repo(folder):
+    """Get all existing branches"""
+    try:
+        # Get local branches
+        local_result = subprocess.run(
+            ['git', '-C', folder, 'branch', '--format=%(refname:short)'],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+        local_branches = [b.strip() for b in local_result.stdout.splitlines() if b.strip()]
+
+        # Get remote branches
+        remote_result = subprocess.run(
+            ['git', '-C', folder, 'branch', '-r', '--format=%(refname:short)'],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+        remote_branches = [b.strip().replace('origin/', '') for b in remote_result.stdout.splitlines() if b.strip()]
+
+        # Combine
+        all_branches = list(set(local_branches + remote_branches))
+        all_branches = [b for b in all_branches if b != 'HEAD' and not b.endswith('HEAD')]
+        all_branches.sort()
+        return all_branches
+    except Exception: return []
 
 # INTERFACE ############################################################################################################
 
@@ -611,8 +695,9 @@ init_button.pack(fill=tk.X, pady=5)
 
 # Tab 2 (Update Repo)
 ttk.Label(tab2, text="Branch:").pack(pady=(10, 0))
-branch_entry = ttk.Entry(tab2, textvariable=branch_var)
+branch_entry = ttk.Combobox(tab2, width=50, textvariable=branch_var)
 branch_entry.pack(pady=5, fill=tk.X)
+branch_entry['values'] = app_state.branches
 branch_var.set("main")
 
 ttk.Label(tab2, text="Message:").pack(pady=(10, 0))
