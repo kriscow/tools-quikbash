@@ -363,7 +363,28 @@ def push_to_github(silent=False):
     timer_start = start_timer()
 
     try:
-        # 1.1) Check if has valid branch
+        # 1.1) Check if has local branch
+        branch_check = subprocess.run(
+            ['git', '-C', folder, 'rev-parse', '--verify', branch],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+        local_branch = (branch_check.returncode == 0)
+
+        if not local_branch: # 1.2) If no local branch
+            if not silent:
+                set_status(f"CREATING BRANCH: {branch}")
+            create_res = subprocess.run(
+                ['git', '-C', folder, 'checkout', '-b', branch],
+                capture_output=True, text=True, creationflags=startup_flags
+            )
+            if create_res.returncode != 0:
+                if not silent:
+                    messagebox.showerror("Git Error", f"Could not create branch '{branch}':\n{create_res.stderr}")
+                    return
+            if not silent:
+                set_status(f"CREATED BRANCH: {branch}")
+
+        # 2.1) Check if has valid branch
         checkout_res = subprocess.run(
             ['git', '-C', folder, 'checkout', branch],
             capture_output=True, text=True, creationflags=startup_flags
@@ -384,7 +405,7 @@ def push_to_github(silent=False):
             if not silent:
                 set_status(f"SWITCHED TO BRANCH: {branch}")
 
-        # 2.1) Check for uncommitted changes
+        # 3.1) Check for uncommitted changes
         status = subprocess.run(
             ['git', '-C', folder, 'status', '--porcelain'],
             capture_output=True, text=True, creationflags=startup_flags
