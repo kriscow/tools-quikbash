@@ -435,19 +435,15 @@ def push_to_github(silent=False):
                     messagebox.showinfo("Push Status", "Everything is already up to date!")
                 return
         else:
-            # New remote branch - always push
-            if not silent:
-                set_status(f"NEW REMOTE BRANCH: {branch}")
+            if not silent: set_status(f"NEW REMOTE BRANCH: {branch}")
 
         # 5) Push
-        if not silent:
-            set_status("PUSHING...")
+        if not silent: set_status("PUSHING...")
 
         result = subprocess.run(
             ['git', '-C', folder, 'push', '-u', 'origin', branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
-
         if result.returncode == 0:
             app_state.save_history(folder)
             if not silent:
