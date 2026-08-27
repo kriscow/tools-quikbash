@@ -1,4 +1,5 @@
 # QUIKBASH
+### Built by a developer, for simple developers.
 
 > Git workflows should not require opening a heavy, resource-intensive desktop application.
 QuikBash is built to be fast and lightweight, focusing solely on the core commands.
