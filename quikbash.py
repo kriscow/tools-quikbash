@@ -87,7 +87,7 @@ def validate_environment(folder_name, check_git=True):
             capture_output=True, text=True, creationflags=startup_flags
         )
         if result.returncode != 0:
-            messagebox.showerror("Error", "Not a Git repository. Initialize/Re-Link it first.")
+            messagebox.showerror("Error", "Not a Git repository. Link it first.")
             return False
     return True
 
@@ -95,7 +95,7 @@ def update_init_button_label():
     """Update init / re-link button label (history-based)"""
     folder = folder_var.get().strip()
     if folder and app_state.is_in_history(folder): init_button.config(text="RE-LINK")
-    else: init_button.config(text="INITIALIZE")
+    else: init_button.config(text="LINK")
 
 # HELPERS ##############################################################################################################
 
@@ -141,7 +141,7 @@ def end_timer(start_time):
 # COMMANDS #############################################################################################################
 
 def init_new_repo():
-    """Initialize / Re-Link > Push"""
+    """Link / Re-Link > Push"""
     folder = folder_var.get().strip()
     url = url_var.get().strip()
 
@@ -483,7 +483,7 @@ def pull_from_github():
         else:
             if "no such remote" in result.stderr.lower():
                 set_status("NO REMOTE FOUND")
-                messagebox.showerror("Pull Failed", "No remote 'origin' found. Initialize the repo first.")
+                messagebox.showerror("Pull Failed", "No remote 'origin' found. Link the repo first.")
             else:
                 set_status("PULL FAILED")
                 messagebox.showerror("Pull Failed", result.stderr)
@@ -571,7 +571,7 @@ ttk.Label(tab1, text="Remote URL:").pack(pady=(10, 0))
 url_entry = ttk.Entry(tab1, textvariable=url_var)
 url_entry.pack(pady=5, fill=tk.X)
 
-init_button = ttk.Button(tab1, text="INITIALIZE", command=lambda: run_async(init_new_repo), state="disabled")
+init_button = ttk.Button(tab1, text="LINK", command=lambda: run_async(init_new_repo), state="disabled")
 init_button.pack(fill=tk.X, pady=5)
 
 # Tab 2 (Update Repo)
