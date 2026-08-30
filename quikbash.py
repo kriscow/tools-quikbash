@@ -72,7 +72,7 @@ def validate_fields(*args):
     folder = folder_var.get().strip()
     if folder:
         pull_button.config(state="normal")
-        if os.path.isdir(folder) and os.path.exists(os.path.join(folder, '.git')): # If folder is a valid git repo, fetch branches
+        if os.path.isdir(folder) and os.path.exists(os.path.join(folder, '.git')): # If folder is a valid, fetch branches
             branches = fetch_branches_from_repo(folder)
             if branches:
                 # Merge with saved history
@@ -85,7 +85,7 @@ def validate_fields(*args):
                 branch_entry['values'] = all_branches
                 merge_from_entry['values'] = all_branches
                 merge_to_entry['values'] = all_branches
-    else: # Restore saved history if no folder
+    else: # Blank if no folder
         pull_button.config(state="disabled")
         branch_entry['values'] = []
         merge_from_entry['values'] = []
@@ -113,7 +113,8 @@ def validate_fields(*args):
 def validate_environment(folder_name, check_git=True):
     """Folder exists && Git repo"""
     if not os.path.isdir(folder_name):
-        messagebox.showerror("Error", f"Path '{folder_name}' is not a valid directory.")
+        messagebox.showerror("Error",
+                             f"Path '{folder_name}' is not a valid directory.")
         return False
 
     if check_git:
@@ -122,7 +123,8 @@ def validate_environment(folder_name, check_git=True):
             capture_output=True, text=True, creationflags=startup_flags
         )
         if result.returncode != 0:
-            messagebox.showerror("Error", "Not a Git repository. Link it first.")
+            messagebox.showerror("Error",
+                                 "Not a Git repository. Link it first.")
             return False
     return True
 
@@ -182,7 +184,8 @@ def init_new_repo():
     branch = "main"
 
     if not folder or not url:
-        messagebox.showwarning("Input", "Please fill up all required fields.")
+        messagebox.showwarning("Input",
+                               "Please fill up all required fields.")
         return
 
     set_processing(True, status_txt="INITIALIZING")
@@ -201,7 +204,8 @@ def init_new_repo():
                 capture_output=True, text=True, creationflags=startup_flags
             )
             if result.returncode != 0:
-                messagebox.showerror("Git Error", f"Failed to link: {result.stderr}")
+                messagebox.showerror("Git Error",
+                                     f"Failed to link: {result.stderr}")
                 return
 
         # 2) Add all files
@@ -210,7 +214,8 @@ def init_new_repo():
             capture_output=True, text=True, creationflags=startup_flags
         )
         if result.returncode != 0:
-            messagebox.showerror("Git Error", f"Failed to add: {result.stderr}")
+            messagebox.showerror("Git Error",
+                                 f"Failed to add: {result.stderr}")
             return
 
         # 3.1) Check for uncommitted changes
@@ -224,10 +229,11 @@ def init_new_repo():
                 capture_output=True, text=True, creationflags=startup_flags
             )
             if result.returncode != 0:
-                messagebox.showerror("Git Error", f"Failed at commit: {result.stderr}")
+                messagebox.showerror("Git Error",
+                                     f"Failed at commit: {result.stderr}")
                 return
         else:
-            set_status("NO CHANGES TO COMMIT")
+            set_status("NO CHANGES DETECTED")
 
         # 4) Set branch to main (default)
         result = subprocess.run(
@@ -235,7 +241,8 @@ def init_new_repo():
             capture_output=True, text=True, creationflags=startup_flags
         )
         if result.returncode != 0:
-            messagebox.showerror("Git Error", f"Failed to set branch: {result.stderr}")
+            messagebox.showerror("Git Error",
+                                 f"Failed to set branch: {result.stderr}")
             return
 
         # 5.1) Check if has valid remote
@@ -249,7 +256,8 @@ def init_new_repo():
                 capture_output=True, text=True, creationflags=startup_flags
             )
             if result.returncode != 0:
-                messagebox.showerror("Git Error", f"Failed to add remote: {result.stderr}")
+                messagebox.showerror("Git Error",
+                                     f"Failed to add remote: {result.stderr}")
                 return
         else:
             result = subprocess.run(
@@ -257,7 +265,8 @@ def init_new_repo():
                 capture_output=True, text=True, creationflags=startup_flags
             )
             if result.returncode != 0:
-                messagebox.showerror("Git Error", f"Failed to update remote: {result.stderr}")
+                messagebox.showerror("Git Error",
+                                     f"Failed to update remote: {result.stderr}")
                 return
 
         # 5.3) Check remote content
@@ -273,7 +282,8 @@ def init_new_repo():
                 capture_output=True, text=True, creationflags=startup_flags
             )
             if pull_result.returncode != 0:
-                messagebox.showwarning("Pull Warning", f"Pull had issues:\n{pull_result.stderr}")
+                messagebox.showwarning("Pull Warning",
+                                       f"Pull had issues:\n{pull_result.stderr}")
         else:
             set_status("REMOTE EMPTY > PUSHING...")
 
@@ -284,13 +294,16 @@ def init_new_repo():
             capture_output=True, text=True, creationflags=startup_flags
         )
         if result.returncode != 0:
-            messagebox.showerror("Git Error", f"Failed at push: {result.stderr}")
+            messagebox.showerror("Git Error",
+                                 f"Failed at push: {result.stderr}")
             return
 
         app_state.save_history(folder)
         elapsed = end_timer(timer_start)
         set_status("INITIALIZE SUCCESS")
-        messagebox.showinfo("Success", f"Initialization finished!\n\nProcess finished in {elapsed}.")
+        messagebox.showinfo("Success",
+                            f"Initialization finished!\n\n"
+                            f"Process finished in {elapsed}.")
         branches = fetch_branches_from_repo(folder)
         if branches:
             all_branches = branches
@@ -313,10 +326,11 @@ def do_all():
     msg = msg_var.get().strip()
 
     if not folder or not msg:
-        messagebox.showwarning("Input", "Please fill up all entry fields.")
+        messagebox.showwarning("Input",
+                               "Please fill up all entry fields.")
         return
 
-    set_processing(True, status_txt="CHECKING UNPUSHED COMMITS")
+    set_processing(True, status_txt="CHECKING UNPUSHED")
     timer_start = start_timer()
 
     try:
@@ -331,7 +345,9 @@ def do_all():
             push_to_github(silent=True)
             elapsed = end_timer(timer_start)
             set_status("Found unpushed commits - pushing...")
-            messagebox.showinfo("Success", f"Commits have been pushed!\n\nProcess finished in {elapsed}.")
+            messagebox.showinfo("Success",
+                                f"Commits have been pushed!\n\n"
+                                f"Process finished in {elapsed}.")
             return
 
         # 2.1) Check uncommitted changes
@@ -344,10 +360,13 @@ def do_all():
             push_to_github(silent=True)
             elapsed = end_timer(timer_start)
             set_status("PUSHING...")
-            messagebox.showinfo("Success", f"Changes have been committed and pushed!\n\nProcess finished in {elapsed}.")
+            messagebox.showinfo("Success",
+                                f"Changes have been committed and pushed!\n\n"
+                                f"Process finished in {elapsed}.")
         else:
-            set_status("EVERYTHING IS UP TO DATE")
-            messagebox.showinfo("Status", "No changes detected.")
+            set_status("NO CHANGES DETECTED")
+            messagebox.showinfo("Status",
+                                "No changes detected.")
     except Exception as e:
         messagebox.showerror("Error", str(e))
     finally:
@@ -359,7 +378,8 @@ def commit_changes(silent=False):
     msg = msg_var.get().strip()
 
     if not msg:
-        messagebox.showwarning("Input", "Please enter a commit message.")
+        messagebox.showwarning("Input",
+                               "Please enter a commit message.")
         return
     if not validate_environment(folder):
         return
@@ -374,8 +394,9 @@ def commit_changes(silent=False):
         )
         if not status.stdout.strip(): # 1.2) If no content changes
             if not silent:
-                messagebox.showinfo("Status", "No changes to commit.")
-            set_status("NO CHANGES")
+                messagebox.showinfo("Status",
+                                    "No changes to commit.")
+            set_status("NO CHANGES DETECTED")
             return
 
         # 2) If has content changes
@@ -387,10 +408,12 @@ def commit_changes(silent=False):
         )
         if result.returncode == 0:
             app_state.save_history(folder)
-            set_status("READY TO PUSH")
+            set_status("PUSH-READY")
             if not silent:
                 elapsed = end_timer(timer_start)
-                messagebox.showinfo("Success", f"Changes have been committed!\n\nProcess finished in {elapsed}.")
+                messagebox.showinfo("Success",
+                                    f"Changes have been committed!\n\n"
+                                    f"Process finished in {elapsed}.")
         else:
             if not silent:
                 elapsed = end_timer(timer_start)
@@ -425,7 +448,8 @@ def push_to_github(silent=False):
             )
             if create_res.returncode != 0:
                 if not silent:
-                    messagebox.showerror("Git Error", f"Could not create branch '{branch}':\n{create_res.stderr}")
+                    messagebox.showerror("Git Error",
+                                         f"Could not create branch '{branch}':\n{create_res.stderr}")
                 return
             if not silent:
                 set_status(f"CREATED BRANCH: {branch}")
@@ -442,7 +466,8 @@ def push_to_github(silent=False):
             )
             if create_res.returncode != 0:
                 if not silent:
-                    messagebox.showerror("Git Error", f"Could not switch to branch '{branch}':\n{checkout_res.stderr}")
+                    messagebox.showerror("Git Error",
+                                         f"Could not switch to branch '{branch}':\n{checkout_res.stderr}")
                 return
             else:
                 if not silent:
@@ -459,7 +484,9 @@ def push_to_github(silent=False):
         if status.stdout.strip():
             if not silent:
                 elapsed = end_timer(timer_start)
-                messagebox.showerror("Push Blocked", f"Uncommitted changes detected! Please commit them first.\n\nProcess finished in {elapsed}.")
+                messagebox.showerror("Push Blocked",
+                                     f"Uncommitted changes detected! Please commit them first.\n\n"
+                                     f"Process finished in {elapsed}.")
             return
 
         # 4.1) Check if remote branch exists
@@ -477,8 +504,9 @@ def push_to_github(silent=False):
             )
             if not check_push.stdout.strip():
                 if not silent:
-                    set_status("EVERYTHING UP TO DATE")
-                    messagebox.showinfo("Push Status", "Everything is already up to date!")
+                    set_status("NO CHANGES DETECTED")
+                    messagebox.showinfo("Push Status",
+                                        "Everything is already up to date!")
                 return
         else:
             if not silent: set_status(f"NEW REMOTE BRANCH: {branch}")
@@ -495,12 +523,16 @@ def push_to_github(silent=False):
             if not silent:
                 elapsed = end_timer(timer_start)
                 set_status("REPOSITORY UPDATED")
-                messagebox.showinfo("Success", f"Commits have been pushed!\n\nProcess finished in {elapsed}.")
+                messagebox.showinfo("Success",
+                                    f"Commits have been pushed!\n\n"
+                                    f"Process finished in {elapsed}.")
         else:
             if "rejected" in result.stderr.lower():
                 if not silent:
-                    set_status("PUSH REJECTED > NEED TO PULL")
-                    messagebox.showerror("Push Failed", "Remote has new commits!\n\nClick 'PULL' first, then try pushing again.")
+                    set_status("PUSH REJECTED > PULL NEEDED")
+                    messagebox.showerror("Push Failed",
+                                         "Remote has new commits!\n\n"
+                                         "Click 'PULL' first, then try pushing again.")
             else:
                 if not silent:
                     set_status("PUSH FAILED")
@@ -515,7 +547,8 @@ def pull_from_github():
     branch = branch_var.get().strip() or "main"
 
     if not folder:
-        messagebox.showwarning("Input", "Please enter a folder path.")
+        messagebox.showwarning("Input",
+                               "Please enter a folder path.")
         return
     if not validate_environment(folder):
         return
@@ -556,7 +589,9 @@ def pull_from_github():
             app_state.save_history(folder)
             elapsed = end_timer(timer_start)
             set_status("PULL SUCCESSFUL")
-            messagebox.showinfo("Success", f"Latest changes pulled from '{branch}'!\n\nProcess finished in {elapsed}.")
+            messagebox.showinfo("Success",
+                                f"Latest changes pulled from '{branch}'!\n\n"
+                                f"Process finished in {elapsed}.")
             branches = fetch_branches_from_repo(folder)
 
             if branches:
@@ -571,7 +606,8 @@ def pull_from_github():
         else:
             if "no such remote" in result.stderr.lower():
                 set_status("NO REMOTE FOUND")
-                messagebox.showerror("Pull Failed", "No remote 'origin' found. Link the repo first.")
+                messagebox.showerror("Pull Failed",
+                                     "No remote 'origin' found. Link the repo first.")
             else:
                 set_status("PULL FAILED")
                 messagebox.showerror("Pull Failed", result.stderr)
@@ -589,15 +625,17 @@ def create_branch():
     new_branch = branch_name_var.get().strip()
 
     if not folder:
-        messagebox.showwarning("Input", "Please enter a folder path.")
+        messagebox.showwarning("Input",
+                               "Please enter a folder path.")
         return
     if not new_branch:
-        messagebox.showwarning("Input", "Please enter a branch name.")
+        messagebox.showwarning("Input",
+                               "Please enter a branch name.")
         return
     if not validate_environment(folder):
         return
 
-    # Check for uncommitted changes
+    # 1) Check for uncommitted changes
     status = subprocess.run(
         ['git', '-C', folder, 'status', '--porcelain'],
         capture_output=True, text=True, creationflags=startup_flags
@@ -611,42 +649,47 @@ def create_branch():
             set_status("CREATE CANCELLED")
             return
 
-        # Check if branch already exists locally
+        # 2) Check if branch already exists locally
         branch_check = subprocess.run(
             ['git', '-C', folder, 'rev-parse', '--verify', new_branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
         if branch_check.returncode == 0:
-            messagebox.showerror("Error", f"Branch '{new_branch}' already exists locally!")
+            messagebox.showerror("Error",
+                                 f"Branch '{new_branch}' already exists locally!")
             return
 
         set_processing(True, status_txt=f"CREATING BRANCH: {new_branch}")
         timer_start = start_timer()
 
     try:
-        # Create and switch to new branch locally
+        # 3) Create and switch to new branch locally
         result = subprocess.run(
             ['git', '-C', folder, 'checkout', '-b', new_branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
         if result.returncode != 0:
-            messagebox.showerror("Git Error", f"Failed to create branch:\n{result.stderr}")
+            messagebox.showerror("Git Error",
+                                 f"Failed to create branch:\n{result.stderr}")
             return
 
-        # Push to remote and set upstream
+        # 4) Push to remote and set upstream
         push_result = subprocess.run(
             ['git', '-C', folder, 'push', '-u', 'origin', new_branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
         if push_result.returncode != 0:
-            messagebox.showerror("Git Error", f"Failed to push branch to remote:\n{push_result.stderr}")
+            messagebox.showerror("Git Error",
+                                 f"Failed to push branch to remote:\n{push_result.stderr}")
             return
 
         elapsed = end_timer(timer_start)
-        set_status(f"BRANCH CREATED & PUSHED: {new_branch}")
-        messagebox.showinfo("Success",f"Branch '{new_branch}' created and pushed to remote!\n\nProcess finished in {elapsed}.")
+        set_status(f"BRANCH CREATED: {new_branch}")
+        messagebox.showinfo("Success",
+                            f"Branch '{new_branch}' created and pushed to remote!\n\n"
+                            f"Process finished in {elapsed}.")
 
-        # Update dropdowns
+        # 5) Update dropdowns
         branches = fetch_branches_from_repo(folder)
         if branches:
             all_branches = branches
@@ -680,32 +723,34 @@ def delete_branch():
     if not validate_environment(folder):
         return
 
-    # Check if branch exists
+    # 1) Check if branch exists
     branch_check = subprocess.run(
         ['git', '-C', folder, 'rev-parse', '--verify', branch],
         capture_output=True, text=True, creationflags=startup_flags
     )
     if branch_check.returncode != 0:
-        messagebox.showerror("Error", f"Branch '{branch}' does not exist!")
+        messagebox.showerror("Error",
+                             f"Branch '{branch}' does not exist!")
         return
 
-    # Check if currently on this branch
+    # 2.1) Check if currently on this branch
     current_branch = subprocess.run(
         ['git', '-C', folder, 'rev-parse', '--abbrev-ref', 'HEAD'],
         capture_output=True, text=True, creationflags=startup_flags
     ).stdout.strip()
 
     if current_branch == branch:
-        # Switch to main first
+        # 2.2) Switch to main first
         subprocess.run(
             ['git', '-C', folder, 'checkout', 'main'],
             capture_output=True, text=True, creationflags=startup_flags
         )
 
-    # Confirm
+    # 3) Confirm
     confirm = messagebox.askyesno(
         "Confirm Delete",
-        f"Delete branch '{branch}'?\n\nThis will delete the local branch and remote branch (if it exists)."
+        f"Delete branch '{branch}'?\n\n"
+        f"This will delete the local branch and remote branch (if it exists)."
     )
     if not confirm:
         set_status("DELETE CANCELLED")
@@ -715,13 +760,13 @@ def delete_branch():
     timer_start = start_timer()
 
     try:
-        # Delete local branch
+        # 4.1) Delete local branch
         result_local = subprocess.run(
             ['git', '-C', folder, 'branch', '-D', branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
 
-        # Delete remote branch if it exists
+        # 4.2) Delete remote branch if it exists
         remote_check = subprocess.run(
             ['git', '-C', folder, 'ls-remote', 'origin', branch],
             capture_output=True, text=True, creationflags=startup_flags
@@ -734,9 +779,11 @@ def delete_branch():
 
         elapsed = end_timer(timer_start)
         set_status(f"BRANCH DELETED: {branch}")
-        messagebox.showinfo("Success", f"Branch '{branch}' deleted!\n\nProcess finished in {elapsed}.")
+        messagebox.showinfo("Success",
+                            f"Branch '{branch}' deleted!\n\n"
+                            f"Process finished in {elapsed}.")
 
-        # Update dropdowns
+        # 5) Update dropdowns
         branches = fetch_branches_from_repo(folder)
         if branches:
             all_branches = branches
@@ -773,7 +820,7 @@ def merge_branch():
     if not validate_environment(folder):
         return
 
-    # Check for uncommitted changes in current branch
+    # 1) Check for uncommitted changes in current branch
     status = subprocess.run(
         ['git', '-C', folder, 'status', '--porcelain'],
         capture_output=True, text=True, creationflags=startup_flags
@@ -787,7 +834,7 @@ def merge_branch():
             set_status("MERGE CANCELLED")
             return
 
-    # Confirm
+    # 2) Confirm
     confirm = messagebox.askyesno(
         "Confirm Merge",
         f"Merge '{from_branch}' INTO '{to_branch}'?\n\n"
@@ -801,27 +848,27 @@ def merge_branch():
     timer_start = start_timer()
 
     try:
-        # Switch to target branch
+        # 3) Switch to target branch
         checkout_res = subprocess.run(
             ['git', '-C', folder, 'checkout', to_branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
         if checkout_res.returncode != 0:
-            messagebox.showerror("Git Error", f"Could not switch to '{to_branch}':\n{checkout_res.stderr}")
+            messagebox.showerror("Git Error",
+                                 f"Could not switch to '{to_branch}':\n{checkout_res.stderr}")
             return
 
-        # Merge
+        # 4.1) Merge
         result = subprocess.run(
             ['git', '-C', folder, 'merge', from_branch],
             capture_output=True, text=True, creationflags=startup_flags
         )
-
         if result.returncode == 0:
             elapsed = end_timer(timer_start)
             set_status(f"MERGE SUCCESS: {from_branch} → {to_branch}")
             messagebox.showinfo("Success",
                                 f"Merged '{from_branch}' INTO '{to_branch}'!\n\nProcess finished in {elapsed}.")
-            # Push the merged branch
+            # 4.2) Push the merged branch
             push_to_github(silent=True)
         else:
             if "merge conflict" in result.stderr.lower():
@@ -829,7 +876,8 @@ def merge_branch():
                                      f"Merge conflict detected!\n\n"
                                      "Please resolve conflicts manually in your editor, then commit and push.")
             else:
-                messagebox.showerror("Git Error", f"Merge failed:\n{result.stderr}")
+                messagebox.showerror("Git Error",
+                                     f"Merge failed:\n{result.stderr}")
     except Exception as e:
         messagebox.showerror("Error", str(e))
     finally:
@@ -847,33 +895,53 @@ def set_folder(path):
 def fetch_branches_from_repo(folder):
     """Get all existing branches"""
     try:
-        # Get local branches
+        # 1.1) Get local branches
         local_result = subprocess.run(
             ['git', '-C', folder, 'branch', '--format=%(refname:short)'],
             capture_output=True, text=True, creationflags=startup_flags
         )
         local_branches = [b.strip() for b in local_result.stdout.splitlines() if b.strip()]
 
-        # Get remote branches
+        # 1.2) Get remote branches
         remote_result = subprocess.run(
             ['git', '-C', folder, 'branch', '-r', '--format=%(refname:short)'],
             capture_output=True, text=True, creationflags=startup_flags
         )
         remote_branches = [b.strip().replace('origin/', '') for b in remote_result.stdout.splitlines() if b.strip()]
 
-        # Combine
+        # 2) Combine
         all_branches = list(set(local_branches + remote_branches))
         all_branches = [b for b in all_branches if b != 'HEAD' and not b.endswith('HEAD')]
         all_branches.sort()
         return all_branches
     except Exception: return []
 
+def show_help():
+    """Show help messagebox"""
+    messagebox.showinfo(
+        "QuikBash Help",
+        "QUIKBASH QUICK GUIDE\n"
+        "=============================\n\n"
+        "SETUP\n"
+        "  • LINK - Initialize or re-link a repository\n"
+        "  • RE-LINK - Reconnect a previously linked repo\n\n"
+        "WORK\n"
+        "  • COMMIT - Save changes locally\n"
+        "  • PUSH   - Upload commits to remote\n"
+        "  • COMMIT & PUSH - Commit and push in one click\n"
+        "  • PULL - Download latest changes from remote\n\n"
+        "BRANCH\n"
+        "  • CREATE - Create and push a new branch\n"
+        "  • DELETE - Remove a branch (local & remote)\n"
+        "  • MERGE - Combine branches (FROM → TO)"
+    )
+
 # INTERFACE ############################################################################################################
 
 # Base
 root = tk.Tk()
-root.title("QuikBash v3.7")
-root.geometry("425x425")
+root.title("QuikBash 3.8")
+root.geometry("425x460")
 root.configure(background=white)
 
 # Style
@@ -942,6 +1010,8 @@ tab_control.add(tab2, text="WORK")
 tab_control.add(tab3, text="BRANCH")
 tab_control.pack(expand=True, fill="both", padx=10)
 
+status_var = tk.StringVar(value="READY")
+
 # Tab 1 (New Repo)
 ttk.Label(tab1, text="Remote URL:").pack(pady=(10, 0))
 url_entry = ttk.Entry(tab1, textvariable=url_var)
@@ -949,6 +1019,9 @@ url_entry.pack(pady=5, fill=tk.X)
 
 init_button = ttk.Button(tab1, text="LINK", command=lambda: run_async(init_new_repo), state="disabled")
 init_button.pack(fill=tk.X, pady=5)
+
+ttk.Frame(tab1).pack(expand=True, fill=tk.BOTH)
+ttk.Label(tab1, textvariable=status_var, style="Status.TLabel", anchor="center", font=('Arial', 9, 'bold')).pack(fill=tk.X, pady=(10, 0))
 
 # Tab 2 (Update Repo)
 ttk.Label(tab2, text="Branch:").pack(pady=(10, 0))
@@ -975,6 +1048,9 @@ sync_button.grid(row=1, column=0, padx=(0, 5), pady=(5, 0), sticky="ew")
 pull_button = ttk.Button(tab2_frame, text="PULL", command=lambda: run_async(pull_from_github), state="disabled")
 pull_button.grid(row=1, column=1, padx=(5, 0), pady=(5, 0), sticky="ew")
 
+ttk.Frame(tab2).pack(expand=True, fill=tk.BOTH)
+ttk.Label(tab2, textvariable=status_var, style="Status.TLabel", anchor="center", font=('Arial', 9, 'bold')).pack(fill=tk.X, pady=(10, 0))
+
 # Tab 3 (Branch Controls)
 ttk.Label(tab3, text="Branch Name:").pack(pady=(10, 0))
 branch_name_entry = ttk.Entry(tab3, textvariable=branch_name_var)
@@ -990,41 +1066,41 @@ create_button.grid(row=0, column=0, padx=(0, 5), pady=(0, 2), sticky="ew")
 delete_button = ttk.Button(tab3_frame, text="DELETE", command=lambda: run_async(delete_branch), state="disabled")
 delete_button.grid(row=0, column=1, padx=(5, 0), pady=(0, 2), sticky="ew")
 
-# Frame for merge comboboxes with arrow
 merge_frame = ttk.Frame(tab3)
 merge_frame.pack(pady=5, fill=tk.X)
 merge_frame.columnconfigure(0, weight=1, uniform="a")
 merge_frame.columnconfigure(1, weight=0)
 merge_frame.columnconfigure(2, weight=1, uniform="a")
 
-# From combobox
 merge_from_entry = ttk.Combobox(merge_frame, textvariable=merge_from_var)
 merge_from_entry.grid(row=0, column=0, padx=(0, 5), sticky="ew")
 merge_from_entry['values'] = []
 
-# Arrow pointing right
 ttk.Label(merge_frame, text="→", font=('Arial', 16, 'bold')).grid(row=0, column=1, padx=3)
 
-# To combobox
 merge_to_entry = ttk.Combobox(merge_frame, textvariable=merge_to_var)
 merge_to_entry.grid(row=0, column=2, padx=(5, 0), sticky="ew")
 merge_to_entry['values'] = []
 
-# Merge button
 merge_button = ttk.Button(tab3, text="MERGE", command=lambda: run_async(merge_branch), state="disabled")
 merge_button.pack(fill=tk.X, pady=5)
 
-# Status Text
-status_frame = ttk.Frame(root)
-status_frame.pack(side=tk.BOTTOM, fill=tk.X)
-status_var = tk.StringVar(value="READY")
-status_label = ttk.Label(status_frame, textvariable=status_var, style="Status.TLabel", anchor="center", font=('Arial', 9, 'bold'))
-status_label.pack(fill=tk.X, padx=10, pady=(0, 3))
+ttk.Frame(tab3).pack(expand=True, fill=tk.BOTH)
+ttk.Label(tab3, textvariable=status_var, style="Status.TLabel", anchor="center", font=('Arial', 9, 'bold')).pack(fill=tk.X, pady=(10, 0))
+
+# Help
+help_frame = ttk.Frame(root)
+help_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(0, 5))
+help_button = ttk.Button(help_frame, text="?", width=3, command=lambda: show_help())
+help_button.pack(side=tk.RIGHT)
+
+# Copyright
+version_label = ttk.Label(help_frame, text="kriscow © 2026", font=('Arial', 8), foreground='gray')
+version_label.pack(side=tk.LEFT)
 
 validate_fields()
 root.mainloop()
 
 # TODO
-#  footer / copyright
-#  merge branch entries
-#  help
+#  merge confirmation
+#  worktree
