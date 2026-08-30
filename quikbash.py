@@ -1102,5 +1102,6 @@ validate_fields()
 root.mainloop()
 
 # TODO
+#  status text inconsistency
 #  merge confirmation
 #  worktree
