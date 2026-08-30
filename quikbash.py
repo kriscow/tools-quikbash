@@ -8,9 +8,7 @@ from tkinter import messagebox, ttk
 # Global Variables
 startup_flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
 h_file = "qb_history.txt"
-b_file = "qb_branches.txt"
 MAX_HISTORY = 5
-MAX_BRANCHES = 64
 
 # Palette
 orange = "#FF7F11"
@@ -23,9 +21,7 @@ green = "#2F6B3F"
 class AppState:
     def __init__(self):
         self.history = []
-        self.branches = []
         self.load_history()
-        self.load_branches()
         self.is_processing = False
 
     def load_history(self):
@@ -50,30 +46,6 @@ class AppState:
     def is_in_history(self, path):
         """Check if path exists in history"""
         return path in self.history
-
-    def load_branches(self):
-        """Load existing branches"""
-        if os.path.exists(b_file):
-            try:
-                with open(b_file, 'r') as f:
-                    self.branches = [line.strip() for line in f.readlines() if line.strip()]
-            except Exception:
-                self.branches = []
-        return self.branches
-
-    def save_branches(self, branch):
-        """Save new branches"""
-        if not branch or branch == "main": return
-        if branch in self.branches:
-            self.branches.remove(branch)
-        self.branches.insert(0, branch)
-        self.branches = self.branches[:MAX_BRANCHES]
-        with open(b_file, 'w') as f:
-            f.write('\n'.join(self.branches))
-
-    def is_in_branches(self, branch):
-        """Check if branch exists in repository"""
-        return branch in self.branches
 
 app_state = AppState()
 
@@ -104,16 +76,39 @@ def validate_fields(*args):
             branches = fetch_branches_from_repo(folder)
             if branches:
                 # Merge with saved history
-                all_branches = list(set(branches + app_state.branches))
+                all_branches = branches
                 all_branches.sort()
                 # Keep 'main' at the top
                 if 'main' in all_branches:
                     all_branches.remove('main')
                     all_branches.insert(0, 'main')
                 branch_entry['values'] = all_branches
+                merge_from_entry['values'] = all_branches
+                merge_to_entry['values'] = all_branches
     else: # Restore saved history if no folder
         pull_button.config(state="disabled")
-        branch_entry['values'] = app_state.branches
+        branch_entry['values'] = []
+        merge_from_entry['values'] = []
+        merge_to_entry['values'] = []
+
+    # For git (branch) commands
+    # Create button
+    if branch_name_var.get().strip():
+        create_button.config(state="normal")
+    else:
+        create_button.config(state="disabled")
+
+    # Delete button
+    if branch_name_var.get().strip() and branch_name_var.get().strip() != "main":
+        delete_button.config(state="normal")
+    else:
+        delete_button.config(state="disabled")
+
+    # Merge button
+    if merge_from_var.get().strip() and merge_to_var.get().strip():
+        merge_button.config(state="normal")
+    else:
+        merge_button.config(state="disabled")
 
 def validate_environment(folder_name, check_git=True):
     """Folder exists && Git repo"""
@@ -178,7 +173,7 @@ def end_timer(start_time):
     if elapsed < 1: return f"{elapsed*1000:.0f}ms"
     else: return f"{elapsed:.2f}s"
 
-# COMMANDS #############################################################################################################
+# CORE COMMANDS ########################################################################################################
 
 def init_new_repo():
     """Link / Re-Link > Push"""
@@ -293,18 +288,19 @@ def init_new_repo():
             return
 
         app_state.save_history(folder)
-        app_state.save_branches(branch)
         elapsed = end_timer(timer_start)
         set_status("INITIALIZE SUCCESS")
         messagebox.showinfo("Success", f"Initialization finished!\n\nProcess finished in {elapsed}.")
         branches = fetch_branches_from_repo(folder)
         if branches:
-            all_branches = list(set(branches + app_state.branches))
+            all_branches = branches
             all_branches.sort()
             if 'main' in all_branches:
                 all_branches.remove('main')
                 all_branches.insert(0, 'main')
             branch_entry['values'] = all_branches
+            merge_from_entry['values'] = all_branches
+            merge_to_entry['values'] = all_branches
     except Exception as e:
         messagebox.showerror("Error", str(e))
     finally:
@@ -333,7 +329,6 @@ def do_all():
 
         if has_unpushed:
             push_to_github(silent=True)
-            app_state.save_branches(branch)
             elapsed = end_timer(timer_start)
             set_status("Found unpushed commits - pushing...")
             messagebox.showinfo("Success", f"Commits have been pushed!\n\nProcess finished in {elapsed}.")
@@ -347,7 +342,6 @@ def do_all():
         if status.stdout.strip(): # 2.2) If has uncommitted changes
             commit_changes(silent=True)
             push_to_github(silent=True)
-            app_state.save_branches(branch)
             elapsed = end_timer(timer_start)
             set_status("PUSHING...")
             messagebox.showinfo("Success", f"Changes have been committed and pushed!\n\nProcess finished in {elapsed}.")
@@ -498,7 +492,6 @@ def push_to_github(silent=False):
         )
         if result.returncode == 0:
             app_state.save_history(folder)
-            app_state.save_branches(branch)
             if not silent:
                 elapsed = end_timer(timer_start)
                 set_status("REPOSITORY UPDATED")
@@ -567,12 +560,14 @@ def pull_from_github():
             branches = fetch_branches_from_repo(folder)
 
             if branches:
-                all_branches = list(set(branches + app_state.branches))
+                all_branches = branches
                 all_branches.sort()
                 if 'main' in all_branches:
                     all_branches.remove('main')
                     all_branches.insert(0, 'main')
                 branch_entry['values'] = all_branches
+                merge_from_entry['values'] = all_branches
+                merge_to_entry['values'] = all_branches
         else:
             if "no such remote" in result.stderr.lower():
                 set_status("NO REMOTE FOUND")
@@ -586,14 +581,268 @@ def pull_from_github():
     finally:
         set_processing(False)
 
+# BRANCH COMMANDS ###############################################################################################################
+
+def create_branch():
+    """Create a new branch from current branch"""
+    folder = folder_var.get().strip()
+    new_branch = branch_name_var.get().strip()
+
+    if not folder:
+        messagebox.showwarning("Input", "Please enter a folder path.")
+        return
+    if not new_branch:
+        messagebox.showwarning("Input", "Please enter a branch name.")
+        return
+    if not validate_environment(folder):
+        return
+
+    # Check for uncommitted changes
+    status = subprocess.run(
+        ['git', '-C', folder, 'status', '--porcelain'],
+        capture_output=True, text=True, creationflags=startup_flags
+    )
+    if status.stdout.strip():
+        confirm = messagebox.askyesno(
+            "Uncommitted Changes",
+            "You have uncommitted changes. They will be carried over to the new branch.\n\nContinue?"
+        )
+        if not confirm:
+            set_status("CREATE CANCELLED")
+            return
+
+        # Check if branch already exists locally
+        branch_check = subprocess.run(
+            ['git', '-C', folder, 'rev-parse', '--verify', new_branch],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+        if branch_check.returncode == 0:
+            messagebox.showerror("Error", f"Branch '{new_branch}' already exists locally!")
+            return
+
+        set_processing(True, status_txt=f"CREATING BRANCH: {new_branch}")
+        timer_start = start_timer()
+
+    try:
+        # Create and switch to new branch locally
+        result = subprocess.run(
+            ['git', '-C', folder, 'checkout', '-b', new_branch],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+        if result.returncode != 0:
+            messagebox.showerror("Git Error", f"Failed to create branch:\n{result.stderr}")
+            return
+
+        # Push to remote and set upstream
+        push_result = subprocess.run(
+            ['git', '-C', folder, 'push', '-u', 'origin', new_branch],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+        if push_result.returncode != 0:
+            messagebox.showerror("Git Error", f"Failed to push branch to remote:\n{push_result.stderr}")
+            return
+
+        elapsed = end_timer(timer_start)
+        set_status(f"BRANCH CREATED & PUSHED: {new_branch}")
+        messagebox.showinfo("Success",f"Branch '{new_branch}' created and pushed to remote!\n\nProcess finished in {elapsed}.")
+
+        # Update dropdowns
+        branches = fetch_branches_from_repo(folder)
+        if branches:
+            all_branches = branches
+            all_branches.sort()
+            if 'main' in all_branches:
+                all_branches.remove('main')
+                all_branches.insert(0, 'main')
+            branch_entry['values'] = all_branches
+            merge_from_entry['values'] = all_branches
+            merge_to_entry['values'] = all_branches
+            branch_var.set(new_branch)
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+    finally:
+        set_processing(False)
+
+def delete_branch():
+    """Delete a branch (local and remote)"""
+    folder = folder_var.get().strip()
+    branch = branch_name_var.get().strip()
+
+    if not folder:
+        messagebox.showwarning("Input", "Please enter a folder path.")
+        return
+    if not branch:
+        messagebox.showwarning("Input", "Please enter a branch name.")
+        return
+    if branch == "main":
+        messagebox.showerror("Error", "Cannot delete 'main' branch!")
+        return
+    if not validate_environment(folder):
+        return
+
+    # Check if branch exists
+    branch_check = subprocess.run(
+        ['git', '-C', folder, 'rev-parse', '--verify', branch],
+        capture_output=True, text=True, creationflags=startup_flags
+    )
+    if branch_check.returncode != 0:
+        messagebox.showerror("Error", f"Branch '{branch}' does not exist!")
+        return
+
+    # Check if currently on this branch
+    current_branch = subprocess.run(
+        ['git', '-C', folder, 'rev-parse', '--abbrev-ref', 'HEAD'],
+        capture_output=True, text=True, creationflags=startup_flags
+    ).stdout.strip()
+
+    if current_branch == branch:
+        # Switch to main first
+        subprocess.run(
+            ['git', '-C', folder, 'checkout', 'main'],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+
+    # Confirm
+    confirm = messagebox.askyesno(
+        "Confirm Delete",
+        f"Delete branch '{branch}'?\n\nThis will delete the local branch and remote branch (if it exists)."
+    )
+    if not confirm:
+        set_status("DELETE CANCELLED")
+        return
+
+    set_processing(True, status_txt=f"DELETING BRANCH: {branch}")
+    timer_start = start_timer()
+
+    try:
+        # Delete local branch
+        result_local = subprocess.run(
+            ['git', '-C', folder, 'branch', '-D', branch],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+
+        # Delete remote branch if it exists
+        remote_check = subprocess.run(
+            ['git', '-C', folder, 'ls-remote', 'origin', branch],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+        if remote_check.stdout.strip():
+            result_remote = subprocess.run(
+                ['git', '-C', folder, 'push', 'origin', '--delete', branch],
+                capture_output=True, text=True, creationflags=startup_flags
+            )
+
+        elapsed = end_timer(timer_start)
+        set_status(f"BRANCH DELETED: {branch}")
+        messagebox.showinfo("Success", f"Branch '{branch}' deleted!\n\nProcess finished in {elapsed}.")
+
+        # Update dropdowns
+        branches = fetch_branches_from_repo(folder)
+        if branches:
+            all_branches = branches
+            all_branches.sort()
+            if 'main' in all_branches:
+                all_branches.remove('main')
+                all_branches.insert(0, 'main')
+            branch_entry['values'] = all_branches
+            merge_from_entry['values'] = all_branches
+            merge_to_entry['values'] = all_branches
+            branch_var.set('main')
+        branch_name_var.set('')
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+    finally:
+        set_processing(False)
+
+
+def merge_branch():
+    """Merge one branch into another"""
+    folder = folder_var.get().strip()
+    from_branch = merge_from_var.get().strip()
+    to_branch = merge_to_var.get().strip()
+
+    if not folder:
+        messagebox.showwarning("Input", "Please enter a folder path.")
+        return
+    if not from_branch or not to_branch:
+        messagebox.showwarning("Input", "Please select both 'From' and 'To' branches.")
+        return
+    if from_branch == to_branch:
+        messagebox.showerror("Error", "Cannot merge a branch into itself!")
+        return
+    if not validate_environment(folder):
+        return
+
+    # Check for uncommitted changes in current branch
+    status = subprocess.run(
+        ['git', '-C', folder, 'status', '--porcelain'],
+        capture_output=True, text=True, creationflags=startup_flags
+    )
+    if status.stdout.strip():
+        confirm = messagebox.askyesno(
+            "Uncommitted Changes",
+            "You have uncommitted changes. Merging with uncommitted changes may cause conflicts.\n\nContinue anyway?"
+        )
+        if not confirm:
+            set_status("MERGE CANCELLED")
+            return
+
+    # Confirm
+    confirm = messagebox.askyesno(
+        "Confirm Merge",
+        f"Merge '{from_branch}' INTO '{to_branch}'?\n\n"
+        "This will combine the changes from both branches."
+    )
+    if not confirm:
+        set_status("MERGE CANCELLED")
+        return
+
+    set_processing(True, status_txt=f"MERGING {from_branch} → {to_branch}")
+    timer_start = start_timer()
+
+    try:
+        # Switch to target branch
+        checkout_res = subprocess.run(
+            ['git', '-C', folder, 'checkout', to_branch],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+        if checkout_res.returncode != 0:
+            messagebox.showerror("Git Error", f"Could not switch to '{to_branch}':\n{checkout_res.stderr}")
+            return
+
+        # Merge
+        result = subprocess.run(
+            ['git', '-C', folder, 'merge', from_branch],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+
+        if result.returncode == 0:
+            elapsed = end_timer(timer_start)
+            set_status(f"MERGE SUCCESS: {from_branch} → {to_branch}")
+            messagebox.showinfo("Success",
+                                f"Merged '{from_branch}' INTO '{to_branch}'!\n\nProcess finished in {elapsed}.")
+            # Push the merged branch
+            push_to_github(silent=True)
+        else:
+            if "merge conflict" in result.stderr.lower():
+                messagebox.showerror("Merge Conflict",
+                                     f"Merge conflict detected!\n\n"
+                                     "Please resolve conflicts manually in your editor, then commit and push.")
+            else:
+                messagebox.showerror("Git Error", f"Merge failed:\n{result.stderr}")
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+    finally:
+        set_processing(False)
+
+# OTHER ################################################################################################################
+
 def set_folder(path):
     """Set folder from history chip"""
     if path and path.strip():
         folder_var.set(path)
         app_state.save_history(path)
         validate_fields()
-
-# OTHER ################################################################################################################
 
 def fetch_branches_from_repo(folder):
     """Get all existing branches"""
@@ -623,7 +872,7 @@ def fetch_branches_from_repo(folder):
 
 # Base
 root = tk.Tk()
-root.title("QuikBash")
+root.title("QuikBash v3.7")
 root.geometry("425x425")
 root.configure(background=white)
 
@@ -665,11 +914,17 @@ folder_var = tk.StringVar()
 url_var = tk.StringVar()
 branch_var = tk.StringVar()
 msg_var = tk.StringVar()
+branch_name_var = tk.StringVar()
+merge_to_var = tk.StringVar()
+merge_from_var = tk.StringVar()
 
 # Button State
 folder_var.trace_add("write", validate_fields)
 url_var.trace_add("write", validate_fields)
 msg_var.trace_add("write", validate_fields)
+branch_name_var.trace_add("write", validate_fields)
+merge_from_var.trace_add("write", validate_fields)
+merge_to_var.trace_add("write", validate_fields)
 
 # Folder Path
 ttk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(20, 0))
@@ -681,8 +936,10 @@ folder_entry['values'] = app_state.history
 tab_control = ttk.Notebook(root)
 tab1 = ttk.Frame(tab_control, padding=10)
 tab2 = ttk.Frame(tab_control, padding=10)
+tab3 = ttk.Frame(tab_control, padding=10)
 tab_control.add(tab1, text="SETUP")
 tab_control.add(tab2, text="WORK")
+tab_control.add(tab3, text="BRANCH")
 tab_control.pack(expand=True, fill="both", padx=10)
 
 # Tab 1 (New Repo)
@@ -697,26 +954,65 @@ init_button.pack(fill=tk.X, pady=5)
 ttk.Label(tab2, text="Branch:").pack(pady=(10, 0))
 branch_entry = ttk.Combobox(tab2, width=50, textvariable=branch_var)
 branch_entry.pack(pady=5, fill=tk.X)
-branch_entry['values'] = app_state.branches
+branch_entry['values'] = []
 branch_var.set("main")
 
 ttk.Label(tab2, text="Message:").pack(pady=(10, 0))
 commit_entry = ttk.Entry(tab2, textvariable=msg_var)
 commit_entry.pack(pady=5, fill=tk.X)
 
-button_frame = ttk.Frame(tab2)
-button_frame.pack(pady=(20, 10), fill=tk.X)
-button_frame.columnconfigure(0, weight=1, uniform="a")
-button_frame.columnconfigure(1, weight=1, uniform="a")
+tab2_frame = ttk.Frame(tab2)
+tab2_frame.pack(pady=5, fill=tk.X)
+tab2_frame.columnconfigure(0, weight=1, uniform="a")
+tab2_frame.columnconfigure(1, weight=1, uniform="a")
 
-anc_button = ttk.Button(button_frame, text="COMMIT", command=lambda: run_async(commit_changes), state="disabled")
+anc_button = ttk.Button(tab2_frame, text="COMMIT", command=lambda: run_async(commit_changes), state="disabled")
 anc_button.grid(row=0, column=0, padx=(0, 5), pady=(0, 5), sticky="ew")
-push_button = ttk.Button(button_frame, text="PUSH", command=lambda: run_async(push_to_github), state="disabled")
+push_button = ttk.Button(tab2_frame, text="PUSH", command=lambda: run_async(push_to_github), state="disabled")
 push_button.grid(row=0, column=1, padx=(5, 0), pady=(0, 5), sticky="ew")
-sync_button = ttk.Button(button_frame, text="COMMIT & PUSH", command=lambda: run_async(do_all), state="disabled")
+sync_button = ttk.Button(tab2_frame, text="COMMIT & PUSH", command=lambda: run_async(do_all), state="disabled")
 sync_button.grid(row=1, column=0, padx=(0, 5), pady=(5, 0), sticky="ew")
-pull_button = ttk.Button(button_frame, text="PULL", command=lambda: run_async(pull_from_github), state="disabled")
+pull_button = ttk.Button(tab2_frame, text="PULL", command=lambda: run_async(pull_from_github), state="disabled")
 pull_button.grid(row=1, column=1, padx=(5, 0), pady=(5, 0), sticky="ew")
+
+# Tab 3 (Branch Controls)
+ttk.Label(tab3, text="Branch Name:").pack(pady=(10, 0))
+branch_name_entry = ttk.Entry(tab3, textvariable=branch_name_var)
+branch_name_entry.pack(pady=5, fill=tk.X)
+
+tab3_frame = ttk.Frame(tab3)
+tab3_frame.pack(pady=5, fill=tk.X)
+tab3_frame.columnconfigure(0, weight=1, uniform="a")
+tab3_frame.columnconfigure(1, weight=1, uniform="a")
+
+create_button = ttk.Button(tab3_frame, text="CREATE", command=lambda: run_async(create_branch), state="disabled")
+create_button.grid(row=0, column=0, padx=(0, 5), pady=(0, 2), sticky="ew")
+delete_button = ttk.Button(tab3_frame, text="DELETE", command=lambda: run_async(delete_branch), state="disabled")
+delete_button.grid(row=0, column=1, padx=(5, 0), pady=(0, 2), sticky="ew")
+
+# Frame for merge comboboxes with arrow
+merge_frame = ttk.Frame(tab3)
+merge_frame.pack(pady=5, fill=tk.X)
+merge_frame.columnconfigure(0, weight=1, uniform="a")
+merge_frame.columnconfigure(1, weight=0)
+merge_frame.columnconfigure(2, weight=1, uniform="a")
+
+# From combobox
+merge_from_entry = ttk.Combobox(merge_frame, textvariable=merge_from_var)
+merge_from_entry.grid(row=0, column=0, padx=(0, 5), sticky="ew")
+merge_from_entry['values'] = []
+
+# Arrow pointing right
+ttk.Label(merge_frame, text="→", font=('Arial', 16, 'bold')).grid(row=0, column=1, padx=3)
+
+# To combobox
+merge_to_entry = ttk.Combobox(merge_frame, textvariable=merge_to_var)
+merge_to_entry.grid(row=0, column=2, padx=(5, 0), sticky="ew")
+merge_to_entry['values'] = []
+
+# Merge button
+merge_button = ttk.Button(tab3, text="MERGE", command=lambda: run_async(merge_branch), state="disabled")
+merge_button.pack(fill=tk.X, pady=5)
 
 # Status Text
 status_frame = ttk.Frame(root)
@@ -727,3 +1023,8 @@ status_label.pack(fill=tk.X, padx=10, pady=(0, 3))
 
 validate_fields()
 root.mainloop()
+
+# TODO
+#  footer / copyright
+#  merge branch entries
+#  help
