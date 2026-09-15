@@ -68,9 +68,14 @@ def validate_fields(*args):
         else:
             btn.config(state="disabled")
 
-    # For git (pull) command
     folder = folder_var.get().strip()
     if folder:
+        # For commit history
+        if folder and os.path.isdir(folder) and os.path.exists(os.path.join(folder, '.git')):
+            commit_history_button.config(state="normal")
+        else:
+            commit_history_button.config(state="disabled")
+        # For git (pull) command
         pull_button.config(state="normal")
         if os.path.isdir(folder) and os.path.exists(os.path.join(folder, '.git')): # If folder is a valid, fetch branches
             branches = fetch_branches_from_repo(folder)
@@ -135,6 +140,18 @@ def update_init_button_label():
     else: init_button.config(text="LINK")
 
 # HELPERS ##############################################################################################################
+
+def is_git_available():
+    """Check if Git is installed and accessible on PATH"""
+    try:
+        r = subprocess.run(
+            ['git', '--version'],
+            capture_output=True, text=True,
+            creationflags=startup_flags
+        )
+        return r.returncode == 0
+    except Exception:
+        return False
 
 def run_async(func):
     threading.Thread(target=func, daemon=True).start()
@@ -617,7 +634,7 @@ def pull_from_github():
     finally:
         set_processing(False)
 
-# BRANCH COMMANDS ###############################################################################################################
+# BRANCH COMMANDS ######################################################################################################
 
 def create_branch():
     """Create a new branch from current branch"""
@@ -916,6 +933,52 @@ def fetch_branches_from_repo(folder):
         return all_branches
     except Exception: return []
 
+def fetch_commits_from_repo():
+    """Show recent commit history in a table window"""
+    folder = folder_var.get().strip()
+    if not folder:
+        messagebox.showwarning("Input", "Please enter a folder path.")
+        return
+    result = subprocess.run(
+        ['git', '-C', folder, 'rev-parse', '--is-inside-work-tree'],
+        capture_output=True, text=True, creationflags=startup_flags
+    )
+    if result.returncode != 0:
+        messagebox.showinfo("Commit History", "No commits available (not a linked repo).")
+        return
+    result = subprocess.run(
+        ['git', '-C', folder, 'log', '-20', '--pretty=format:%h|%s|%an|%ar'],
+        capture_output=True, text=True, creationflags=startup_flags
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        messagebox.showinfo("Commit History", "No commits available.")
+        return
+    # Popup
+    win = tk.Toplevel(root)
+    win.title("Recent Commits (Max 20)")
+    win.geometry("700x400")
+    win.configure(background=white)
+    # Table
+    tree = ttk.Treeview(win, columns=("hash", "message", "author", "date"), show="headings")
+    tree.heading("hash", text="Hash")
+    tree.heading("message", text="Message")
+    tree.heading("author", text="Author")
+    tree.heading("date", text="When")
+    tree.column("hash", width=80)
+    tree.column("message", width=350)
+    tree.column("author", width=120)
+    tree.column("date", width=100)
+    # Scrollbar
+    scrollbar = ttk.Scrollbar(win, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
+    tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    # Rows
+    for line in result.stdout.splitlines():
+        parts = line.split('|')
+        if len(parts) == 4:
+            tree.insert("", tk.END, values=tuple(parts))
+
 def show_help():
     """Show help messagebox"""
     messagebox.showinfo(
@@ -940,7 +1003,7 @@ def show_help():
 
 # Base
 root = tk.Tk()
-root.title("QuikBash 3.8")
+root.title("QuikBash 3.9")
 root.geometry("425x460")
 root.configure(background=white)
 
@@ -1020,6 +1083,9 @@ url_entry.pack(pady=5, fill=tk.X)
 init_button = ttk.Button(tab1, text="LINK", command=lambda: run_async(init_new_repo), state="disabled")
 init_button.pack(fill=tk.X, pady=5)
 
+commit_history_button = ttk.Button(tab1, text="CHECK COMMITS", command=lambda: run_async(fetch_commits_from_repo), state="disabled")
+commit_history_button.pack(fill=tk.X, pady=5)
+
 ttk.Frame(tab1).pack(expand=True, fill=tk.BOTH)
 ttk.Label(tab1, textvariable=status_var, style="Status.TLabel", anchor="center", font=('Arial', 9, 'bold')).pack(fill=tk.X, pady=(10, 0))
 
@@ -1098,10 +1164,21 @@ help_button.pack(side=tk.RIGHT)
 version_label = ttk.Label(help_frame, text="kriscow © 2026", font=('Arial', 8), foreground='gray')
 version_label.pack(side=tk.LEFT)
 
+if not is_git_available():
+    messagebox.showerror(
+        "Git Not Found",
+        "Git is not installed or not found on your system PATH.\n"
+        "Please install Git and add it to your PATH to use this app."
+    )
+    root.destroy()
+
 validate_fields()
 root.mainloop()
 
 # TODO
 #  status text inconsistency
 #  merge confirmation
+#  undo last commit
+#  diff viewer
+#  gitignore
 #  worktree
