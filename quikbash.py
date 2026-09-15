@@ -70,27 +70,45 @@ def validate_fields(*args):
 
     folder = folder_var.get().strip()
     if folder:
-        # For commit history
-        if folder and os.path.isdir(folder) and os.path.exists(os.path.join(folder, '.git')):
+        is_valid_repo = os.path.isdir(folder) and os.path.exists(os.path.join(folder, '.git'))
+        # Commit history & .gitignore
+        if is_valid_repo:
             commit_history_button.config(state="normal")
+            ignore_button.config(state="normal")
         else:
             commit_history_button.config(state="disabled")
-        # For git (pull) command
-        pull_button.config(state="normal")
-        if os.path.isdir(folder) and os.path.exists(os.path.join(folder, '.git')): # If folder is a valid, fetch branches
+            ignore_button.config(state="disabled")
+        # Undo commit
+        if is_valid_repo:
+            check = subprocess.run(
+                ['git', '-C', folder, 'rev-parse', 'HEAD'],
+                capture_output=True, text=True, creationflags=startup_flags
+            )
+            if check.returncode == 0:
+                undo_button.config(state="normal")
+            else:
+                undo_button.config(state="disabled")
+        else:
+            undo_button.config(state="disabled")
+        # Pull
+        if is_valid_repo:
+            pull_button.config(state="normal")
             branches = fetch_branches_from_repo(folder)
             if branches:
-                # Merge with saved history
                 all_branches = branches
                 all_branches.sort()
-                # Keep 'main' at the top
                 if 'main' in all_branches:
                     all_branches.remove('main')
                     all_branches.insert(0, 'main')
                 branch_entry['values'] = all_branches
                 merge_from_entry['values'] = all_branches
                 merge_to_entry['values'] = all_branches
-    else: # Blank if no folder
+        else:
+            pull_button.config(state="disabled")
+    else:  # No folder
+        commit_history_button.config(state="disabled")
+        ignore_button.config(state="disabled")
+        undo_button.config(state="disabled")
         pull_button.config(state="disabled")
         branch_entry['values'] = []
         merge_from_entry['values'] = []
@@ -439,6 +457,75 @@ def commit_changes(silent=False):
         if not silent:
             elapsed = end_timer(timer_start)
             messagebox.showerror("Error", str(e))
+
+def undo_last_commit():
+    """Undo the last commit but keep changes staged"""
+    folder = folder_var.get().strip()
+    branch = branch_var.get().strip() or "main"
+
+    if not folder:
+        messagebox.showwarning("Input", "Please enter a folder path.")
+        return
+    if not validate_environment(folder):
+        return
+
+    # Check if there are any commits
+    check = subprocess.run(
+        ['git', '-C', folder, 'rev-parse', 'HEAD'],
+        capture_output=True, text=True, creationflags=startup_flags
+    )
+    if check.returncode != 0:
+        messagebox.showinfo("Undo Commit", "No commits to undo.")
+        return
+
+    # Get info about the last commit
+    last_commit = subprocess.run(
+        ['git', '-C', folder, 'log', '-1', '--pretty=format:%h - %s'],
+        capture_output=True, text=True, creationflags=startup_flags
+    ).stdout.strip()
+
+    # Check if the commit was already pushed
+    unpushed = subprocess.run(
+        ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
+        capture_output=True, text=True, creationflags=startup_flags
+    )
+
+    warning = f"Undo last commit?\n\n{last_commit}\n\n"
+    warning += "The commit will be removed, but your changes will stay staged."
+    if not unpushed.stdout.strip():
+        warning += "\n\nWARNING: This commit is already on the remote!"
+        warning += "\nUndoing will make your local copy diverge from GitHub."
+
+    confirm = messagebox.askyesno("Confirm Undo", warning)
+    if not confirm:
+        set_status("UNDO CANCELLED")
+        return
+
+    set_processing(True, status_txt="UNDOING COMMIT")
+    timer_start = start_timer()
+
+    try:
+        result = subprocess.run(
+            ['git', '-C', folder, 'reset', '--soft', 'HEAD~1'],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+
+        if result.returncode == 0:
+            elapsed = end_timer(timer_start)
+            set_status("COMMIT UNDONE")
+            messagebox.showinfo(
+                "Success",
+                f"Last commit undone!\n\n"
+                f"Your changes are still staged and ready to re-commit.\n\n"
+                f"Process finished in {elapsed}."
+            )
+        else:
+            set_status("UNDO FAILED")
+            messagebox.showerror("Git Error", result.stderr)
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+    finally:
+        set_processing(False)
 
 def push_to_github(silent=False):
     """Push"""
@@ -953,6 +1040,7 @@ def fetch_commits_from_repo():
     if result.returncode != 0 or not result.stdout.strip():
         messagebox.showinfo("Commit History", "No commits available.")
         return
+
     # Popup
     win = tk.Toplevel(root)
     win.title("Recent Commits (Max 20)")
@@ -979,6 +1067,50 @@ def fetch_commits_from_repo():
         if len(parts) == 4:
             tree.insert("", tk.END, values=tuple(parts))
 
+def fetch_ignore():
+    """Show current .gitignore contents in a scrollable window"""
+    folder = folder_var.get().strip()
+    if not folder:
+        messagebox.showwarning("Input", "Please enter a folder path.")
+        return
+
+    gitignore_path = os.path.join(folder, '.gitignore')
+    if not os.path.exists(gitignore_path):
+        messagebox.showinfo("Gitignore", "No .gitignore file found in this repo.")
+        return
+
+    try:
+        with open(gitignore_path, 'r', encoding='utf-8') as f:
+            contents = f.read()
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not read .gitignore:\n{str(e)}")
+        return
+
+    if not contents.strip():
+        messagebox.showinfo("Gitignore", ".gitignore exists but is empty.")
+        return
+
+    # Create popup window
+    win = tk.Toplevel(root)
+    win.title("Ignored Contents")
+    win.geometry("500x400")
+    win.configure(background=white)
+    # Text widget with scrollbar
+    text_frame = ttk.Frame(win)
+    text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 5))
+    text = tk.Text(text_frame, wrap="none", font=('Consolas', 10), background=white, foreground=dark, borderwidth=0)
+    scrollbar_y = ttk.Scrollbar(text_frame, orient="vertical", command=text.yview)
+    scrollbar_x = ttk.Scrollbar(text_frame, orient="horizontal", command=text.xview)
+    text.configure(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
+    text.grid(row=0, column=0, sticky="nsew")
+    scrollbar_y.grid(row=0, column=1, sticky="ns")
+    scrollbar_x.grid(row=1, column=0, sticky="ew")
+    text_frame.rowconfigure(0, weight=1)
+    text_frame.columnconfigure(0, weight=1)
+    # Contents
+    text.insert("1.0", contents)
+    text.config(state="disabled")
+
 def show_help():
     """Show help messagebox"""
     messagebox.showinfo(
@@ -1003,8 +1135,8 @@ def show_help():
 
 # Base
 root = tk.Tk()
-root.title("QuikBash 3.9")
-root.geometry("425x460")
+root.title("QuikBash 4.2")
+root.geometry("425x490")
 root.configure(background=white)
 
 # Style
@@ -1086,6 +1218,9 @@ init_button.pack(fill=tk.X, pady=5)
 commit_history_button = ttk.Button(tab1, text="CHECK COMMITS", command=lambda: run_async(fetch_commits_from_repo), state="disabled")
 commit_history_button.pack(fill=tk.X, pady=5)
 
+ignore_button = ttk.Button(tab1, text="CHECK IGNORE", command=lambda: run_async(fetch_ignore), state="disabled")
+ignore_button.pack(fill=tk.X, pady=5)
+
 ttk.Frame(tab1).pack(expand=True, fill=tk.BOTH)
 ttk.Label(tab1, textvariable=status_var, style="Status.TLabel", anchor="center", font=('Arial', 9, 'bold')).pack(fill=tk.X, pady=(10, 0))
 
@@ -1106,13 +1241,15 @@ tab2_frame.columnconfigure(0, weight=1, uniform="a")
 tab2_frame.columnconfigure(1, weight=1, uniform="a")
 
 anc_button = ttk.Button(tab2_frame, text="COMMIT", command=lambda: run_async(commit_changes), state="disabled")
-anc_button.grid(row=0, column=0, padx=(0, 5), pady=(0, 5), sticky="ew")
+anc_button.grid(row=0, column=0, padx=(0, 5), pady=5, sticky="ew")
+undo_button = ttk.Button(tab2_frame, text="UNDO COMMIT", command=lambda: run_async(undo_last_commit), state="disabled")
+undo_button.grid(row=0, column=1, padx=(5, 0), pady=5, sticky="ew")
 push_button = ttk.Button(tab2_frame, text="PUSH", command=lambda: run_async(push_to_github), state="disabled")
-push_button.grid(row=0, column=1, padx=(5, 0), pady=(0, 5), sticky="ew")
-sync_button = ttk.Button(tab2_frame, text="COMMIT & PUSH", command=lambda: run_async(do_all), state="disabled")
-sync_button.grid(row=1, column=0, padx=(0, 5), pady=(5, 0), sticky="ew")
+push_button.grid(row=1, column=0, padx=(0, 5), pady=5, sticky="ew")
 pull_button = ttk.Button(tab2_frame, text="PULL", command=lambda: run_async(pull_from_github), state="disabled")
-pull_button.grid(row=1, column=1, padx=(5, 0), pady=(5, 0), sticky="ew")
+pull_button.grid(row=1, column=1, padx=(5, 0), pady=5, sticky="ew")
+sync_button = ttk.Button(tab2_frame, text="COMMIT & PUSH", command=lambda: run_async(do_all), state="disabled")
+sync_button.grid(row=2, column=0, padx=(0, 5), pady=5, sticky="ew")
 
 ttk.Frame(tab2).pack(expand=True, fill=tk.BOTH)
 ttk.Label(tab2, textvariable=status_var, style="Status.TLabel", anchor="center", font=('Arial', 9, 'bold')).pack(fill=tk.X, pady=(10, 0))
@@ -1177,8 +1314,5 @@ root.mainloop()
 
 # TODO
 #  status text inconsistency
-#  merge confirmation
-#  undo last commit
-#  diff viewer
 #  gitignore
 #  worktree
