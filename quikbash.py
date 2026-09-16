@@ -1320,5 +1320,6 @@ root.mainloop()
 
 # TODO
 #  entry fields quikhelp
+#  undo commit not disabling during process
 #  open in editor
 #  worktree
