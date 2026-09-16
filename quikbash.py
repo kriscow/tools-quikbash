@@ -1036,7 +1036,7 @@ def fetch_commits_from_repo():
         messagebox.showinfo("Commit History", "No commits available (not a linked repo).")
         return
     result = subprocess.run(
-        ['git', '-C', folder, 'log', '-20', '--pretty=format:%h|%s|%an|%ar'],
+        ['git', '-C', folder, 'log', '-20', '--pretty=format:%h%x1f%s%x1f%an%x1f%ar'],
         capture_output=True, text=True, creationflags=startup_flags
     )
     if result.returncode != 0 or not result.stdout.strip():
@@ -1063,9 +1063,9 @@ def fetch_commits_from_repo():
     tree.configure(yscrollcommand=scrollbar.set)
     tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
     scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-    # Rows
+    # Rows (note: split on \x1f now)
     for line in result.stdout.splitlines():
-        parts = line.split('|')
+        parts = line.split('\x1f')
         if len(parts) == 4:
             tree.insert("", tk.END, values=tuple(parts))
 
@@ -1321,5 +1321,6 @@ root.mainloop()
 # TODO
 #  entry fields quikhelp
 #  undo commit not disabling during process
+#  add branch on view commits
 #  open in editor
 #  worktree
