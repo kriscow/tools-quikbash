@@ -8,7 +8,7 @@ from tkinter import messagebox, ttk
 # Global Variables
 startup_flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
 h_file = "qb_history.txt"
-MAX_HISTORY = 5
+MAX_HISTORY = 12
 
 # Palette
 orange = "#FF7F11"
@@ -69,17 +69,18 @@ def validate_fields(*args):
             btn.config(state="disabled")
 
     # For git (branch) commands
-    if branch_name_var.get().strip():
+    can_branch_operate = bool(folder_var.get().strip() and branch_name_var.get().strip())
+    if can_branch_operate:
         create_button.config(state="normal")
     else:
         create_button.config(state="disabled")
 
-    if branch_name_var.get().strip() and branch_name_var.get().strip() != "main":
+    if can_branch_operate and branch_name_var.get().strip() != "main":
         delete_button.config(state="normal")
     else:
         delete_button.config(state="disabled")
 
-    if merge_from_var.get().strip() and merge_to_var.get().strip():
+    if folder_var.get().strip() and merge_from_var.get().strip() and merge_to_var.get().strip():
         merge_button.config(state="normal")
     else:
         merge_button.config(state="disabled")
@@ -89,7 +90,7 @@ def validate_fields(*args):
     if folder and os.path.isdir(folder):
         if hasattr(root, '_validate_after_id'):
             root.after_cancel(root._validate_after_id)
-        root._validate_after_id = root.after(300, lambda: validate_fields_ex(folder))
+        root._validate_after_id = root.after(400, lambda: validate_fields_ex(folder))
     else:
         commit_history_button.config(state="disabled")
         ignore_button.config(state="disabled")
@@ -727,15 +728,12 @@ def create_branch():
     new_branch = branch_name_var.get().strip()
 
     if not folder:
-        messagebox.showwarning("Input",
-                               "Please enter a folder path.")
+        messagebox.showwarning("Input","Please enter a folder path.")
         return
     if not new_branch:
-        messagebox.showwarning("Input",
-                               "Please enter a branch name.")
+        messagebox.showwarning("Input","Please enter a branch name.")
         return
-    if not validate_environment(folder):
-        return
+    if not validate_environment(folder): return
 
     # 1) Check for uncommitted changes
     status = subprocess.run(
@@ -751,18 +749,18 @@ def create_branch():
             set_status("CREATE BRANCH CANCELLED")
             return
 
-        # 2) Check if branch already exists locally
-        branch_check = subprocess.run(
-            ['git', '-C', folder, 'rev-parse', '--verify', new_branch],
-            capture_output=True, text=True, creationflags=startup_flags
-        )
-        if branch_check.returncode == 0:
-            messagebox.showerror("Error",
-                                 f"Branch '{new_branch}' already exists locally!")
-            return
+    # 2) Check if branch already exists locally
+    branch_check = subprocess.run(
+        ['git', '-C', folder, 'rev-parse', '--verify', new_branch],
+        capture_output=True, text=True, creationflags=startup_flags
+    )
+    if branch_check.returncode == 0:
+        messagebox.showerror("Error",
+                             f"Branch '{new_branch}' already exists locally!")
+        return
 
-        set_processing(True, status_txt=f"CREATING BRANCH: {new_branch}")
-        timer_start = start_timer()
+    set_processing(True, status_txt=f"CREATING BRANCH: {new_branch}")
+    timer_start = start_timer()
 
     try:
         # 3) Create and switch to new branch locally
@@ -1118,28 +1116,32 @@ def fetch_ignore():
 def show_help():
     """Show help messagebox"""
     messagebox.showinfo(
-        "QuikBash Help",
-        "QUIKBASH QUICK GUIDE\n"
+        "QuikHelp",
         "=============================\n\n"
         "SETUP\n"
         "  • LINK - Initialize or re-link a repository\n"
-        "  • RE-LINK - Reconnect a previously linked repo\n\n"
+        "  • RE-LINK - Reconnect a previously linked repo\n"
+        "  • VIEW COMMITS - View most recent 20 commits\n"
+        "  • VIEW IGNORE - View .gitignore contents\n\n"
         "WORK\n"
         "  • COMMIT - Save changes locally\n"
+        "  • UNDO COMMIT - Revert version to previous commit\n"
         "  • PUSH   - Upload commits to remote\n"
-        "  • COMMIT & PUSH - Commit and push in one click\n"
-        "  • PULL - Download latest changes from remote\n\n"
+        "  • PULL - Download latest changes from remote\n"
+        "  • COMMIT & PUSH - Commit and push in one click\n\n"
         "BRANCH\n"
         "  • CREATE - Create and push a new branch\n"
         "  • DELETE - Remove a branch (local & remote)\n"
-        "  • MERGE - Combine branches (FROM → TO)"
+        "  • MERGE - Combine branches (FROM → TO)\n\n"
+        "=============================\n\n"
+        "Build Version: 4.3.stable\n"
     )
 
 # INTERFACE ############################################################################################################
 
 # Base
 root = tk.Tk()
-root.title("QuikBash 4.2")
+root.title("QuikBash")
 root.geometry("425x490")
 root.configure(background=white)
 
@@ -1219,10 +1221,10 @@ url_entry.pack(pady=5, fill=tk.X)
 init_button = ttk.Button(tab1, text="LINK", command=lambda: run_async(init_new_repo), state="disabled")
 init_button.pack(fill=tk.X, pady=5)
 
-commit_history_button = ttk.Button(tab1, text="CHECK COMMITS", command=lambda: run_async(fetch_commits_from_repo), state="disabled")
+commit_history_button = ttk.Button(tab1, text="VIEW COMMITS", command=lambda: run_async(fetch_commits_from_repo), state="disabled")
 commit_history_button.pack(fill=tk.X, pady=5)
 
-ignore_button = ttk.Button(tab1, text="CHECK IGNORE", command=lambda: run_async(fetch_ignore), state="disabled")
+ignore_button = ttk.Button(tab1, text="VIEW IGNORE", command=lambda: run_async(fetch_ignore), state="disabled")
 ignore_button.pack(fill=tk.X, pady=5)
 
 ttk.Frame(tab1).pack(expand=True, fill=tk.BOTH)
@@ -1253,7 +1255,7 @@ push_button.grid(row=1, column=0, padx=(0, 5), pady=5, sticky="ew")
 pull_button = ttk.Button(tab2_frame, text="PULL", command=lambda: run_async(pull_from_github), state="disabled")
 pull_button.grid(row=1, column=1, padx=(5, 0), pady=5, sticky="ew")
 sync_button = ttk.Button(tab2_frame, text="COMMIT & PUSH", command=lambda: run_async(do_all), state="disabled")
-sync_button.grid(row=2, column=0, padx=(0, 5), pady=5, sticky="ew")
+sync_button.grid(row=2, column=0, columnspan=2, pady=5, sticky="ew")
 
 ttk.Frame(tab2).pack(expand=True, fill=tk.BOTH)
 ttk.Label(tab2, textvariable=status_var, style="Status.TLabel", anchor="center", font=('Arial', 9, 'bold')).pack(fill=tk.X, pady=(10, 0))
@@ -1317,6 +1319,6 @@ validate_fields()
 root.mainloop()
 
 # TODO
-#  status text inconsistency
+#  entry fields quikhelp
 #  open in editor
 #  worktree

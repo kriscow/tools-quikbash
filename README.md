@@ -10,10 +10,11 @@ It is perfect for users who just want to get their code pushed without the wait.
 ## 🟢 Overview
 | Property | Details |
 |:-----|:-----|
-| **Engine** | Python 2026.1.1 |
+| **Engine** | Python 3.14 |
 | **Developer** | KRISCOW |
 | **Format** | Desktop Tool |
-| **Version** | Beta 1.1 |
+| **Version** | Stable 4.3 |
+| **Publicized** | July 7, 2026 |
 
 ---
 
