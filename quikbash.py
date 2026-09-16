@@ -52,7 +52,7 @@ app_state = AppState()
 # VALIDATION ###########################################################################################################
 
 def validate_fields(*args):
-    """Enable/disable buttons"""
+    """Cheap validation"""
     # For init / re-link
     if folder_var.get().strip() and url_var.get().strip():
         init_button.config(state="normal")
@@ -68,44 +68,29 @@ def validate_fields(*args):
         else:
             btn.config(state="disabled")
 
+    # For git (branch) commands
+    if branch_name_var.get().strip():
+        create_button.config(state="normal")
+    else:
+        create_button.config(state="disabled")
+
+    if branch_name_var.get().strip() and branch_name_var.get().strip() != "main":
+        delete_button.config(state="normal")
+    else:
+        delete_button.config(state="disabled")
+
+    if merge_from_var.get().strip() and merge_to_var.get().strip():
+        merge_button.config(state="normal")
+    else:
+        merge_button.config(state="disabled")
+
+    # For folder-based buttons
     folder = folder_var.get().strip()
-    if folder:
-        is_valid_repo = os.path.isdir(folder) and os.path.exists(os.path.join(folder, '.git'))
-        # Commit history & .gitignore
-        if is_valid_repo:
-            commit_history_button.config(state="normal")
-            ignore_button.config(state="normal")
-        else:
-            commit_history_button.config(state="disabled")
-            ignore_button.config(state="disabled")
-        # Undo commit
-        if is_valid_repo:
-            check = subprocess.run(
-                ['git', '-C', folder, 'rev-parse', 'HEAD'],
-                capture_output=True, text=True, creationflags=startup_flags
-            )
-            if check.returncode == 0:
-                undo_button.config(state="normal")
-            else:
-                undo_button.config(state="disabled")
-        else:
-            undo_button.config(state="disabled")
-        # Pull
-        if is_valid_repo:
-            pull_button.config(state="normal")
-            branches = fetch_branches_from_repo(folder)
-            if branches:
-                all_branches = branches
-                all_branches.sort()
-                if 'main' in all_branches:
-                    all_branches.remove('main')
-                    all_branches.insert(0, 'main')
-                branch_entry['values'] = all_branches
-                merge_from_entry['values'] = all_branches
-                merge_to_entry['values'] = all_branches
-        else:
-            pull_button.config(state="disabled")
-    else:  # No folder
+    if folder and os.path.isdir(folder):
+        if hasattr(root, '_validate_after_id'):
+            root.after_cancel(root._validate_after_id)
+        root._validate_after_id = root.after(300, lambda: validate_fields_ex(folder))
+    else:
         commit_history_button.config(state="disabled")
         ignore_button.config(state="disabled")
         undo_button.config(state="disabled")
@@ -114,24 +99,43 @@ def validate_fields(*args):
         merge_from_entry['values'] = []
         merge_to_entry['values'] = []
 
-    # For git (branch) commands
-    # Create button
-    if branch_name_var.get().strip():
-        create_button.config(state="normal")
-    else:
-        create_button.config(state="disabled")
+def validate_fields_ex(folder):
+    """Expensive validation"""
+    is_valid_repo = os.path.exists(os.path.join(folder, '.git'))
 
-    # Delete button
-    if branch_name_var.get().strip() and branch_name_var.get().strip() != "main":
-        delete_button.config(state="normal")
-    else:
-        delete_button.config(state="disabled")
+    if not is_valid_repo:
+        commit_history_button.config(state="disabled")
+        ignore_button.config(state="disabled")
+        undo_button.config(state="disabled")
+        pull_button.config(state="disabled")
+        return
 
-    # Merge button
-    if merge_from_var.get().strip() and merge_to_var.get().strip():
-        merge_button.config(state="normal")
+    # Commit history & .gitignore
+    commit_history_button.config(state="normal")
+    ignore_button.config(state="normal")
+
+    # Undo commit
+    check = subprocess.run(
+        ['git', '-C', folder, 'rev-parse', 'HEAD'],
+        capture_output=True, text=True, creationflags=startup_flags
+    )
+    if check.returncode == 0:
+        undo_button.config(state="normal")
     else:
-        merge_button.config(state="disabled")
+        undo_button.config(state="disabled")
+
+    # Pull + branches
+    pull_button.config(state="normal")
+    branches = fetch_branches_from_repo(folder)
+    if branches:
+        all_branches = branches
+        all_branches.sort()
+        if 'main' in all_branches:
+            all_branches.remove('main')
+            all_branches.insert(0, 'main')
+        branch_entry['values'] = all_branches
+        merge_from_entry['values'] = all_branches
+        merge_to_entry['values'] = all_branches
 
 def validate_environment(folder_name, check_git=True):
     """Folder exists && Git repo"""
@@ -150,12 +154,6 @@ def validate_environment(folder_name, check_git=True):
                                  "Not a Git repository. Link it first.")
             return False
     return True
-
-def update_init_button_label():
-    """Update init / re-link button label (history-based)"""
-    folder = folder_var.get().strip()
-    if folder and app_state.is_in_history(folder): init_button.config(text="RE-LINK")
-    else: init_button.config(text="LINK")
 
 # HELPERS ##############################################################################################################
 
@@ -995,6 +993,12 @@ def set_folder(path):
         folder_var.set(path)
         app_state.save_history(path)
         validate_fields()
+
+def update_init_button_label():
+    """Update init / re-link button label (history-based)"""
+    folder = folder_var.get().strip()
+    if folder and app_state.is_in_history(folder): init_button.config(text="RE-LINK")
+    else: init_button.config(text="LINK")
 
 def fetch_branches_from_repo(folder):
     """Get all existing branches"""
