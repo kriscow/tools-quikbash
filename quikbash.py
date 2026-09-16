@@ -311,7 +311,7 @@ def init_new_repo():
             capture_output=True, text=True, creationflags=startup_flags
         )
         if remote_check.stdout.strip(): # 5.4) Pull if remote has content
-            set_status("REMOTE HAS CONTENT > PULLING...")
+            set_status("REMOTE HAS CONTENT. PULLING...")
             pull_result = subprocess.run(
                 ['git', '-C', folder, 'pull', 'origin', 'main', '--allow-unrelated-histories'],
                 capture_output=True, text=True, creationflags=startup_flags
@@ -320,7 +320,7 @@ def init_new_repo():
                 messagebox.showwarning("Pull Warning",
                                        f"Pull had issues:\n{pull_result.stderr}")
         else:
-            set_status("REMOTE EMPTY > PUSHING...")
+            set_status("REMOTE EMPTY. PUSHING...")
 
         # 6) Push
         set_status("PUSHING...")
@@ -379,7 +379,7 @@ def do_all():
         if has_unpushed:
             push_to_github(silent=True)
             elapsed = end_timer(timer_start)
-            set_status("Found unpushed commits - pushing...")
+            set_status("UNPUSHED COMMITS. PUSHING...")
             messagebox.showinfo("Success",
                                 f"Commits have been pushed!\n\n"
                                 f"Process finished in {elapsed}.")
@@ -396,7 +396,7 @@ def do_all():
             elapsed = end_timer(timer_start)
             set_status("PUSHING...")
             messagebox.showinfo("Success",
-                                f"Changes have been committed and pushed!\n\n"
+                                f"Changes committed and pushed!\n\n"
                                 f"Process finished in {elapsed}.")
         else:
             set_status("NO CHANGES DETECTED")
@@ -575,7 +575,7 @@ def push_to_github(silent=False):
                 return
             else:
                 if not silent:
-                    set_status(f"CREATED & SWITCHED TO BRANCH: {branch}")
+                    set_status(f"SWITCHED TO BRANCH: {branch}")
         else:
             if not silent:
                 set_status(f"SWITCHED TO BRANCH: {branch}")
@@ -610,7 +610,7 @@ def push_to_github(silent=False):
                 if not silent:
                     set_status("NO CHANGES DETECTED")
                     messagebox.showinfo("Push Status",
-                                        "Everything is already up to date!")
+                                        "No commits to push.")
                 return
         else:
             if not silent: set_status(f"NEW REMOTE BRANCH: {branch}")
@@ -633,7 +633,7 @@ def push_to_github(silent=False):
         else:
             if "rejected" in result.stderr.lower():
                 if not silent:
-                    set_status("PUSH REJECTED > PULL NEEDED")
+                    set_status("PUSH REJECTED. PULL NEEDED")
                     messagebox.showerror("Push Failed",
                                          "Remote has new commits!\n\n"
                                          "Click 'PULL' first, then try pushing again.")
@@ -750,7 +750,7 @@ def create_branch():
             "You have uncommitted changes. They will be carried over to the new branch.\n\nContinue?"
         )
         if not confirm:
-            set_status("CREATE CANCELLED")
+            set_status("CREATE BRANCH CANCELLED")
             return
 
         # 2) Check if branch already exists locally
@@ -1314,5 +1314,5 @@ root.mainloop()
 
 # TODO
 #  status text inconsistency
-#  gitignore
+#  open in editor
 #  worktree
