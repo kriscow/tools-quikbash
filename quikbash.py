@@ -1053,7 +1053,7 @@ def fetch_commits_from_repo():
         messagebox.showinfo("Commit History", "No commits available (not a linked repo).")
         return
     result = subprocess.run(
-        ['git', '-C', folder, 'log', '-20', '--pretty=format:%h%x1f%s%x1f%an%x1f%ar'],
+        ['git', '-C', folder, 'log', '-20', '--pretty=format:%h%x1f%s%x1f%an%x1f%d%x1f%ar'],
         capture_output=True, text=True, creationflags=startup_flags
     )
     if result.returncode != 0 or not result.stdout.strip():
@@ -1063,17 +1063,19 @@ def fetch_commits_from_repo():
     # Popup
     win = tk.Toplevel(root)
     win.title("Recent Commits (Max 20)")
-    win.geometry("700x400")
+    win.geometry("750x350")
     win.configure(background=white)
     # Table
-    tree = ttk.Treeview(win, columns=("hash", "message", "author", "date"), show="headings")
+    tree = ttk.Treeview(win, columns=("hash", "message", "author", "branch", "date"), show="headings")
     tree.heading("hash", text="Hash")
     tree.heading("message", text="Message")
     tree.heading("author", text="Author")
+    tree.heading("branch", text="Branch")
     tree.heading("date", text="When")
     tree.column("hash", width=80)
     tree.column("message", width=350)
     tree.column("author", width=120)
+    tree.column("branch", width=100)
     tree.column("date", width=100)
     # Scrollbar
     scrollbar = ttk.Scrollbar(win, orient="vertical", command=tree.yview)
@@ -1083,8 +1085,37 @@ def fetch_commits_from_repo():
 
     for line in result.stdout.splitlines():
         parts = line.split('\x1f')
-        if len(parts) == 4:
-            tree.insert("", tk.END, values=tuple(parts))
+        if len(parts) == 5:
+            h, msg, author, refs, date = parts
+            branch = format_refs(refs)
+            tree.insert("", tk.END, values=(h, msg, author, branch, date))
+
+def format_refs(refs):
+    """Clean up git ref decorations into readable branch names"""
+    if not refs: return ""
+
+    print(f"RAW REFS: {repr(refs)}")
+
+    refs = refs.strip().strip("()")
+    parts = [p.strip() for p in refs.split(",")]
+    cleaned = []
+    for p in parts:
+        # Remove 'HEAD ->'
+        if "->" in p:
+            p = p.split("->")[-1].strip()
+        # Skip 'HEAD' alone and 'xorigin/HEAD'
+        if p == "HEAD" or p.endswith("/HEAD"):
+            continue
+        # Strip origin/ prefix
+        if p.startswith("origin/"):
+            p = p.replace("origin/", "")
+            if p in cleaned:
+                continue
+        cleaned.append(p)
+
+    print(f"  RESULT: {repr(cleaned)}")  # ← DEBUG
+
+    return ", ".join(cleaned)
 
 def fetch_ignore():
     """Show current .gitignore contents in a scrollable window"""
@@ -1208,7 +1239,7 @@ def show_help():
 
     ttk.Label(
         footer_frame,
-        text="Build Version: 4.7.stable",
+        text="Build Version: 4.8.stable",
         font=('Arial', 8),
         background=white,
         foreground='gray'
@@ -1396,8 +1427,6 @@ validate_fields()
 root.mainloop()
 
 # TODO
-#  entry fields quikhelp
-#  add branch on view commits
 #  make workflow mouse-less (if possible)
 #  fix readme file
 #  open in editor
