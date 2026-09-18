@@ -1131,24 +1131,59 @@ def fetch_ignore():
     text.config(state="disabled")
 
 def show_help():
-    """Show help in a table window"""
+    """Guide on entries and buttons"""
     win = tk.Toplevel(root)
     win.title("QuikHelp")
-    win.geometry("475x312")
+    win.geometry("500x475")
     win.configure(background=white)
 
-    # Container
-    table_frame = ttk.Frame(win)
-    table_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0, 10))
-    tree = ttk.Treeview(table_frame, columns=("tab", "button", "action"), show="headings")
-    tree.heading("tab", text="Tab")
-    tree.heading("button", text="Button")
-    tree.heading("action", text="Action")
-    tree.column("tab", width=80, anchor="center")
-    tree.column("button", width=115, anchor="w")
-    tree.column("action", width=230, anchor="w")
+    # Entries Help
+    entry_container = ttk.Frame(win)
+    entry_container.pack(fill=tk.X, padx=15, pady=(0, 0))
 
-    contents = [
+    entry_tree = ttk.Treeview(
+        entry_container,
+        columns=("col1", "col2", "col3"),
+        show="headings",
+        height=6
+    )
+    entry_tree.heading("col1", text="Tab")
+    entry_tree.heading("col2", text="Field")
+    entry_tree.heading("col3", text="Description")
+    entry_tree.column("col1", width=80, anchor="center")
+    entry_tree.column("col2", width=110, anchor="w")
+    entry_tree.column("col3", width=215, anchor="w")
+
+    entries = [
+        ("GLOBAL", "Folder Path", "File path of local repository folder"),
+        ("SETUP", "Remote URL", "GitHub repository URL (HTTPS format)"),
+        ("WORK", "Branch", "Branch to work on (defaults to 'main')"),
+        ("WORK", "Message", "Commit message describing changes"),
+        ("BRANCH", "Branch Name", "Name for a new branch"),
+        ("BRANCH", "From → To", "Source and target branches for merging"),
+    ]
+    for tab, field, desc in entries:
+        entry_tree.insert("", tk.END, values=(tab, field, desc))
+
+    entry_tree.pack(fill=tk.X)
+
+    # Buttons Help
+    button_container = ttk.Frame(win)
+    button_container.pack(fill=tk.BOTH, expand=True, padx=15, pady=(10, 10))
+
+    button_tree = ttk.Treeview(
+        button_container,
+        columns=("col1", "col2", "col3"),
+        show="headings"
+    )
+    button_tree.heading("col1", text="Tab")
+    button_tree.heading("col2", text="Button")
+    button_tree.heading("col3", text="Action")
+    button_tree.column("col1", width=80, anchor="center")
+    button_tree.column("col2", width=110, anchor="w")
+    button_tree.column("col3", width=215, anchor="w")
+
+    buttons = [
         ("SETUP", "LINK", "Initialize or re-link a repository"),
         ("↳", "RE-LINK", "...or reconnect a previously linked repo"),
         ("SETUP", "VIEW COMMITS", "View most recent 20 commits"),
@@ -1162,23 +1197,18 @@ def show_help():
         ("BRANCH", "DELETE", "Remove a branch (local & remote)"),
         ("BRANCH", "MERGE", "Combine branches (FROM → TO)"),
     ]
-    for tab, button, action in contents:
-        tree.insert("", tk.END, values=(tab, button, action))
+    for tab, button, action in buttons:
+        button_tree.insert("", tk.END, values=(tab, button, action))
 
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=scrollbar.set)
-
-    tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    button_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
     # Footer
     footer_frame = ttk.Frame(win)
     footer_frame.pack(fill=tk.X, padx=15, pady=(0, 15))
 
-    # Version label
     ttk.Label(
         footer_frame,
-        text="Build Version: 4.5.stable",
+        text="Build Version: 4.7.stable",
         font=('Arial', 8),
         background=white,
         foreground='gray'
@@ -1366,7 +1396,7 @@ validate_fields()
 root.mainloop()
 
 # TODO
-#  entry fields quikhelp / beautify quikhelp
+#  entry fields quikhelp
 #  add branch on view commits
 #  make workflow mouse-less (if possible)
 #  fix readme file
