@@ -177,7 +177,19 @@ def update_sts(func, **kwargs):
     root.after(0, lambda: func(**kwargs))
 
 def update_btns(state):
-    buttons = [init_button, anc_button, push_button, sync_button, pull_button]
+    buttons = [
+        init_button,
+        commit_history_button,
+        ignore_button,
+        anc_button,
+        undo_button,
+        push_button,
+        pull_button,
+        sync_button,
+        create_button,
+        delete_button,
+        merge_button,
+    ]
     for btn in buttons:
         update_sts(btn.config, state=state)
 
@@ -1134,7 +1146,7 @@ def show_help():
         "  • DELETE - Remove a branch (local & remote)\n"
         "  • MERGE - Combine branches (FROM → TO)\n\n"
         "=============================\n\n"
-        "Build Version: 4.3.stable\n"
+        "Build Version: 4.4.stable\n"
     )
 
 # INTERFACE ############################################################################################################
@@ -1187,7 +1199,7 @@ branch_name_var = tk.StringVar()
 merge_to_var = tk.StringVar()
 merge_from_var = tk.StringVar()
 
-# Button State
+# Button State Basis
 folder_var.trace_add("write", validate_fields)
 url_var.trace_add("write", validate_fields)
 msg_var.trace_add("write", validate_fields)
@@ -1319,8 +1331,10 @@ validate_fields()
 root.mainloop()
 
 # TODO
-#  entry fields quikhelp
+#  entry fields quikhelp / beautify quikhelp
 #  undo commit not disabling during process
 #  add branch on view commits
+#  make workflow mouse-less (if possible)
+#  fix readme file
 #  open in editor
 #  worktree
