@@ -1485,5 +1485,5 @@ root.mainloop()
 # TODO
 #  make workflow mouse-less (if possible)
 #  fix readme file
-#  open in editor
+#  add when to use re-link in help
 #  worktree
