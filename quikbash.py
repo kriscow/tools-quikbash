@@ -427,9 +427,8 @@ def commit_changes(silent=False):
         messagebox.showwarning("Input",
                                "Please enter a commit message.")
         return
-    if not validate_environment(folder):
-        return
-
+    if not validate_environment(folder): return
+    if not silent: set_processing(True, status_txt="COMMITTING")
     timer_start = start_timer()
 
     try:
@@ -468,6 +467,8 @@ def commit_changes(silent=False):
         if not silent:
             elapsed = end_timer(timer_start)
             messagebox.showerror("Error", str(e))
+    finally:
+        if not silent: set_processing(False)
 
 def undo_last_commit():
     """Undo the last commit but keep changes staged"""
@@ -544,6 +545,7 @@ def push_to_github(silent=False):
     branch = branch_var.get().strip() or "main"
 
     if not validate_environment(folder): return
+    if not silent: set_processing(True, status_txt="PUSHING")
     timer_start = start_timer()
 
     try:
@@ -654,7 +656,10 @@ def push_to_github(silent=False):
                     messagebox.showerror("Push Failed", result.stderr)
     except Exception as e:
         if not silent:
+            elapsed = end_timer(timer_start)
             messagebox.showerror("Error", str(e))
+    finally:
+        if not silent: set_processing(False)
 
 def pull_from_github():
     """Pull"""
