@@ -2,43 +2,54 @@
 ### Built by a developer, for simple developers.
 
 > Git workflows should not require opening a heavy, resource-intensive desktop application.
-QuikBash is built to be fast and lightweight, focusing solely on the core commands.
-It is perfect for users who just want to get their code pushed without the wait.
+QuikBash is built to be fast and lightweight, focusing solely on the core commands needed for simple projects.
+It is perfect for users who just want to get their repositories updated without the wait.
 
 ---
 
 ## 🟢 Overview
-| Property | Details |
-|:-----|:-----|
-| **Engine** | Python 3.14 |
-| **Developer** | KRISCOW |
-| **Format** | Desktop Tool |
-| **Version** | Stable 4.3 |
-| **Publicized** | July 7, 2026 |
+| Property         | Details      |          |
+|:-----------------|:-------------|:---------|
+| **Developer**    | KRISCOW      | INDIE    |
+| **Engine**       | Python       | 3.14.4   |
+| **Format**       | Desktop Tool | EXE      |
+| **Release**      | v4.3.stable  | RELEASED |
+| **Repository**   | v4.9.stable  | ONGOING  |
+| **Size**         | 11.3 MB      | -        |
+| **License**      | MIT          | -        |
+| **Public Since** | July 7, 2026 | -        |
 
 ---
 
 ## 🟡 Features
-*  **One-Click Git Operations:** Initialize repositories, add files, commit, and push with ease.
-*  **Smart Workflow:** Built-in checks to ensure environment is Git-ready.
-*  **Threaded Architecture:** Prevents the interface from freezing during Git processes.
-*  **Path Tracking:** Easily manage and revisit recently used project paths.
+### Core Operations
+* Connect local and remote repositories.
+* View existing commits and ignored files without leaving.
+* The core stage, commit, and push commands that can be done in one click.
+* Ability to create, delete, and merge branches.
+* Important controls such as pull and undo commit.
+### Quality of Life
+* Jump to the repository in File Explorer.
+* Quickly scan and select project paths through saved histories.
+* Debounced input for instant typing.
+* And other stuff you can discover-in-app!
 
 ---
 
 ## 🔵 Installation
+### For Users
+1. Download the latest **QuikBash.exe** from the [Releases](https://github.com/kriscow/quikbash-tool/releases) page.
+2. Ensure [Git](https://git-scm.com/downloads) is installed on your PATH.
+3. Simply run the application.
+
 ### For Developers
 1. Clone this repository.
-2. Ensure you have [Git](https://git-scm.com/downloads) installed and added to your system's PATH.
-3. Ensure you have [Python](https://www.python.org/) installed.
-4. Install the required dependency:
-   ```bash
-   pip install pyinstaller
-5. Build the executable file using the spec file:
-   ```bash
-   py -m PyInstaller --noconfirm QuikBash.spec
-
-### For Users
-1. Download the latest version of QuikBash.exe from the [Releases](https://github.com/kriscow/quikbash-tool/releases) page.
-2. Ensure you have [Git](https://git-scm.com/downloads) installed on your system.
-3. Simply run QuikBash.exe.
+2. Install [Git](https://git-scm.com/downloads) and [Python](https://www.python.org/).
+3. Install PyInstaller
+```
+py -m pip install pyinstaller
+```
+4. Build the executable:
+```
+py -m PyInstaller --noconfirm QuikBash.spec
+```

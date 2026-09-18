@@ -1484,6 +1484,15 @@ root.mainloop()
 
 # TODO
 #  make workflow mouse-less (if possible)
-#  fix readme file
 #  add when to use re-link in help
+#  fix initial commit message for re-link
 #  worktree
+
+# what is new
+# open folder
+# branch is now seen in commit viewer
+
+# fixes
+# better quikhelp
+# better button state management
+# drive root bypass on folder entry
