@@ -92,6 +92,7 @@ def validate_fields(*args):
             root.after_cancel(root._validate_after_id)
         root._validate_after_id = root.after(400, lambda: validate_fields_ex(folder))
     else:
+        explorer_button.config(state="disabled")
         commit_history_button.config(state="disabled")
         ignore_button.config(state="disabled")
         undo_button.config(state="disabled")
@@ -102,7 +103,13 @@ def validate_fields(*args):
 
 def validate_fields_ex(folder):
     """Expensive validation"""
-    is_valid_repo = os.path.exists(os.path.join(folder, '.git'))
+    result = subprocess.run(
+        ['git', '-C', folder, 'rev-parse', '--is-inside-work-tree'],
+        capture_output=True, text=True, creationflags=startup_flags
+    )
+    is_valid_repo = (result.returncode == 0)
+
+    explorer_button.config(state="normal")
 
     if not is_valid_repo:
         commit_history_button.config(state="disabled")
@@ -1040,7 +1047,7 @@ def fetch_branches_from_repo(folder):
     except Exception: return []
 
 def fetch_commits_from_repo():
-    """Show recent commit history in a table window"""
+    """Show recent commit history"""
     folder = folder_var.get().strip()
     if not folder:
         messagebox.showwarning("Input", "Please enter a folder path.")
@@ -1063,7 +1070,7 @@ def fetch_commits_from_repo():
     # Popup
     win = tk.Toplevel(root)
     win.title("Recent Commits (Max 20)")
-    win.geometry("750x350")
+    win.geometry("775x250")
     win.configure(background=white)
     # Table
     tree = ttk.Treeview(win, columns=("hash", "message", "author", "branch", "date"), show="headings")
@@ -1091,19 +1098,17 @@ def fetch_commits_from_repo():
             tree.insert("", tk.END, values=(h, msg, author, branch, date))
 
 def format_refs(refs):
-    """Clean up git ref decorations into readable branch names"""
+    """Clean up git ref decor"""
     if not refs: return ""
-
-    print(f"RAW REFS: {repr(refs)}")
-
     refs = refs.strip().strip("()")
     parts = [p.strip() for p in refs.split(",")]
     cleaned = []
+
     for p in parts:
         # Remove 'HEAD ->'
         if "->" in p:
             p = p.split("->")[-1].strip()
-        # Skip 'HEAD' alone and 'xorigin/HEAD'
+        # Skip 'HEAD' alone and 'origin/HEAD'
         if p == "HEAD" or p.endswith("/HEAD"):
             continue
         # Strip origin/ prefix
@@ -1112,13 +1117,10 @@ def format_refs(refs):
             if p in cleaned:
                 continue
         cleaned.append(p)
-
-    print(f"  RESULT: {repr(cleaned)}")  # ← DEBUG
-
     return ", ".join(cleaned)
 
 def fetch_ignore():
-    """Show current .gitignore contents in a scrollable window"""
+    """Show current .gitignore contents"""
     folder = folder_var.get().strip()
     if not folder:
         messagebox.showwarning("Input", "Please enter a folder path.")
@@ -1160,6 +1162,25 @@ def fetch_ignore():
     # Contents
     text.insert("1.0", contents)
     text.config(state="disabled")
+
+def open_in_explorer():
+    folder = folder_var.get().strip()
+
+    if not folder:
+        messagebox.showwarning("Input", "Please enter a folder path.")
+        return
+    if not os.path.isdir(folder):
+        messagebox.showerror("Error", f"path '{folder}' is not a valid directory or does not exist.")
+        return
+
+    try:
+        os.startfile(folder) # Win
+    except AttributeError:
+        import platform
+        if platform.system() == "Darwin": # Mac
+            subprocess.Popen(["open", folder])
+        else: # Linux
+            subprocess.Popen(["xdg-open", folder])
 
 def show_help():
     """Guide on entries and buttons"""
@@ -1215,6 +1236,7 @@ def show_help():
     button_tree.column("col3", width=215, anchor="w")
 
     buttons = [
+        ("GLOBAL", "OPEN FOLDER", "Open folder path in explorer"),
         ("SETUP", "LINK", "Initialize or re-link a repository"),
         ("↳", "RE-LINK", "...or reconnect a previously linked repo"),
         ("SETUP", "VIEW COMMITS", "View most recent 20 commits"),
@@ -1250,7 +1272,7 @@ def show_help():
 # Base
 root = tk.Tk()
 root.title("QuikBash")
-root.geometry("425x490")
+root.geometry("425x530")
 root.configure(background=white)
 
 # Style
@@ -1304,10 +1326,13 @@ merge_from_var.trace_add("write", validate_fields)
 merge_to_var.trace_add("write", validate_fields)
 
 # Folder Path
-ttk.Label(root, text="Folder Path:", font=('Arial', 10, 'bold')).pack(pady=(20, 0))
+ttk.Label(root, text="Folder Path:").pack(pady=(20, 0))
 folder_entry = ttk.Combobox(root, width=50, textvariable=folder_var)
-folder_entry.pack(pady=(5, 30), padx=20, fill=tk.X)
+folder_entry.pack(pady=(5, 5), padx=20, fill=tk.X)
 folder_entry['values'] = app_state.history
+
+explorer_button = ttk.Button(root, text="OPEN FOLDER", command=lambda: run_async(open_in_explorer), state="disabled")
+explorer_button.pack(padx=20, pady=(5, 30), fill=tk.X)
 
 # Tab Setup
 tab_control = ttk.Notebook(root)
