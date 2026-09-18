@@ -87,7 +87,8 @@ def validate_fields(*args):
 
     # For folder-based buttons
     folder = folder_var.get().strip()
-    if folder and os.path.isdir(folder):
+    is_drive_root = (len(folder) <= 2 and folder.endswith(":")) or folder.endswith(":\\") or folder.endswith(":/")
+    if folder and os.path.isdir(folder) and not is_drive_root:
         if hasattr(root, '_validate_after_id'):
             root.after_cancel(root._validate_after_id)
         root._validate_after_id = root.after(400, lambda: validate_fields_ex(folder))
