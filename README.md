@@ -15,8 +15,6 @@ It is perfect for users who just want to get their repositories updated without 
 | **Format**       | Desktop Tool | EXE      |
 | **Release**      | v4.3.stable  | RELEASED |
 | **Repository**   | v4.9.stable  | ONGOING  |
-| **Size**         | 11.3 MB      | -        |
-| **License**      | MIT          | -        |
 | **Public Since** | July 7, 2026 | -        |
 
 ---
