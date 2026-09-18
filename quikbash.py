@@ -1075,7 +1075,7 @@ def fetch_commits_from_repo():
     tree.configure(yscrollcommand=scrollbar.set)
     tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
     scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-    # Rows (note: split on \x1f now)
+
     for line in result.stdout.splitlines():
         parts = line.split('\x1f')
         if len(parts) == 4:
@@ -1126,28 +1126,58 @@ def fetch_ignore():
     text.config(state="disabled")
 
 def show_help():
-    """Show help messagebox"""
-    messagebox.showinfo(
-        "QuikHelp",
-        "=============================\n\n"
-        "SETUP\n"
-        "  • LINK - Initialize or re-link a repository\n"
-        "  • RE-LINK - Reconnect a previously linked repo\n"
-        "  • VIEW COMMITS - View most recent 20 commits\n"
-        "  • VIEW IGNORE - View .gitignore contents\n\n"
-        "WORK\n"
-        "  • COMMIT - Save changes locally\n"
-        "  • UNDO COMMIT - Revert version to previous commit\n"
-        "  • PUSH   - Upload commits to remote\n"
-        "  • PULL - Download latest changes from remote\n"
-        "  • COMMIT & PUSH - Commit and push in one click\n\n"
-        "BRANCH\n"
-        "  • CREATE - Create and push a new branch\n"
-        "  • DELETE - Remove a branch (local & remote)\n"
-        "  • MERGE - Combine branches (FROM → TO)\n\n"
-        "=============================\n\n"
-        "Build Version: 4.4.stable\n"
-    )
+    """Show help in a table window"""
+    win = tk.Toplevel(root)
+    win.title("QuikHelp")
+    win.geometry("475x312")
+    win.configure(background=white)
+
+    # Container
+    table_frame = ttk.Frame(win)
+    table_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0, 10))
+    tree = ttk.Treeview(table_frame, columns=("tab", "button", "action"), show="headings")
+    tree.heading("tab", text="Tab")
+    tree.heading("button", text="Button")
+    tree.heading("action", text="Action")
+    tree.column("tab", width=80, anchor="center")
+    tree.column("button", width=115, anchor="w")
+    tree.column("action", width=230, anchor="w")
+
+    contents = [
+        ("SETUP", "LINK", "Initialize or re-link a repository"),
+        ("↳", "RE-LINK", "...or reconnect a previously linked repo"),
+        ("SETUP", "VIEW COMMITS", "View most recent 20 commits"),
+        ("SETUP", "VIEW IGNORE", "View .gitignore contents"),
+        ("WORK", "COMMIT", "Save changes locally"),
+        ("WORK", "UNDO COMMIT", "Revert to previous commit, keep changes"),
+        ("WORK", "PUSH", "Upload commits to remote"),
+        ("WORK", "PULL", "Download latest changes from remote"),
+        ("WORK", "COMMIT & PUSH", "Commit and push in one click"),
+        ("BRANCH", "CREATE", "Create and push a new branch"),
+        ("BRANCH", "DELETE", "Remove a branch (local & remote)"),
+        ("BRANCH", "MERGE", "Combine branches (FROM → TO)"),
+    ]
+    for tab, button, action in contents:
+        tree.insert("", tk.END, values=(tab, button, action))
+
+    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
+
+    tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    # Footer
+    footer_frame = ttk.Frame(win)
+    footer_frame.pack(fill=tk.X, padx=15, pady=(0, 15))
+
+    # Version label
+    ttk.Label(
+        footer_frame,
+        text="Build Version: 4.5.stable",
+        font=('Arial', 8),
+        background=white,
+        foreground='gray'
+    ).pack(side=tk.RIGHT)
 
 # INTERFACE ############################################################################################################
 
@@ -1332,7 +1362,6 @@ root.mainloop()
 
 # TODO
 #  entry fields quikhelp / beautify quikhelp
-#  undo commit not disabling during process
 #  add branch on view commits
 #  make workflow mouse-less (if possible)
 #  fix readme file
