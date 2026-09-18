@@ -147,6 +147,21 @@ def validate_fields_ex(folder):
 
 def validate_environment(folder_name, check_git=True):
     """Folder exists && Git repo"""
+    folder_name = folder_name.strip()
+
+    # Reject empty or drive roots
+    if not folder_name:
+        messagebox.showwarning("Input", "Please enter a folder path.")
+        return False
+
+    if len(folder_name) <= 2 and folder_name.endswith(":"):
+        messagebox.showerror("Error", "Please select a folder, not a drive root.")
+        return False
+
+    if folder_name.endswith(":\\") or folder_name.endswith(":/"):
+        messagebox.showerror("Error", "Please select a folder, not a drive root.")
+        return False
+
     if not os.path.isdir(folder_name):
         messagebox.showerror("Error",
                              f"Path '{folder_name}' is not a valid directory.")
@@ -158,8 +173,7 @@ def validate_environment(folder_name, check_git=True):
             capture_output=True, text=True, creationflags=startup_flags
         )
         if result.returncode != 0:
-            messagebox.showerror("Error",
-                                 "Not a Git repository. Link it first.")
+            messagebox.showerror("Error", "Not a Git repository. Link it first.")
             return False
     return True
 
@@ -379,15 +393,13 @@ def do_all():
     msg = msg_var.get().strip()
 
     if not folder or not msg:
-        messagebox.showwarning("Input",
-                               "Please fill up all entry fields.")
+        messagebox.showwarning("Input", "Please fill up all entry fields.")
         return
 
     set_processing(True, status_txt="CHECKING UNPUSHED")
     timer_start = start_timer()
 
     try:
-        # 1) Check unpushed commits
         check_push = subprocess.run(
             ['git', '-C', folder, 'log', f'origin/{branch}..{branch}', '--oneline'],
             capture_output=True, text=True, creationflags=startup_flags
@@ -395,31 +407,42 @@ def do_all():
         has_unpushed = bool(check_push.stdout.strip())
 
         if has_unpushed:
-            push_to_github(silent=True)
+            success = push_to_github(silent=True)
             elapsed = end_timer(timer_start)
-            set_status("UNPUSHED COMMITS. PUSHING...")
-            messagebox.showinfo("Success",
-                                f"Commits have been pushed!\n\n"
-                                f"Process finished in {elapsed}.")
+            if success:
+                set_status("UNPUSHED COMMITS. PUSHED.")
+                messagebox.showinfo("Success",
+                                    f"Commits have been pushed!\n\nProcess finished in {elapsed}.")
+            else:
+                set_status("PUSH FAILED")
+                messagebox.showerror("Push Failed",
+                                     "Could not push. Check your folder path and Git setup.")
             return
 
-        # 2.1) Check uncommitted changes
         status = subprocess.run(
             ['git', '-C', folder, 'status', '--porcelain'],
             capture_output=True, text=True, creationflags=startup_flags
         )
-        if status.stdout.strip(): # 2.2) If has uncommitted changes
-            commit_changes(silent=True)
-            push_to_github(silent=True)
+        if status.stdout.strip():
+            commit_ok = commit_changes(silent=True)
+            if not commit_ok:
+                set_status("COMMIT FAILED")
+                messagebox.showerror("Commit Failed",
+                                     "Could not commit. Check your folder path and Git setup.")
+                return
+            push_ok = push_to_github(silent=True)
             elapsed = end_timer(timer_start)
-            set_status("PUSHING...")
-            messagebox.showinfo("Success",
-                                f"Changes committed and pushed!\n\n"
-                                f"Process finished in {elapsed}.")
+            if push_ok:
+                set_status("PUSHED")
+                messagebox.showinfo("Success",
+                                    f"Changes committed and pushed!\n\nProcess finished in {elapsed}.")
+            else:
+                set_status("PUSH FAILED")
+                messagebox.showerror("Push Failed",
+                                     "Commit succeeded, but push failed.")
         else:
             set_status("NO CHANGES DETECTED")
-            messagebox.showinfo("Status",
-                                "No changes detected.")
+            messagebox.showinfo("Status", "No changes detected.")
     except Exception as e:
         messagebox.showerror("Error", str(e))
     finally:
@@ -433,8 +456,8 @@ def commit_changes(silent=False):
     if not msg:
         messagebox.showwarning("Input",
                                "Please enter a commit message.")
-        return
-    if not validate_environment(folder): return
+        return False
+    if not validate_environment(folder): return False
     if not silent: set_processing(True, status_txt="COMMITTING")
     timer_start = start_timer()
 
@@ -449,7 +472,7 @@ def commit_changes(silent=False):
                 messagebox.showinfo("Status",
                                     "No changes to commit.")
             set_status("NO CHANGES DETECTED")
-            return
+            return False
 
         # 2) If has content changes
         set_status("STAGING & COMMITTING...")
@@ -466,14 +489,17 @@ def commit_changes(silent=False):
                 messagebox.showinfo("Success",
                                     f"Changes have been committed!\n\n"
                                     f"Process finished in {elapsed}.")
+            return True
         else:
             if not silent:
                 elapsed = end_timer(timer_start)
                 messagebox.showerror("Git Error", result.stderr)
+            return False
     except Exception as e:
         if not silent:
             elapsed = end_timer(timer_start)
             messagebox.showerror("Error", str(e))
+        return False
     finally:
         if not silent: set_processing(False)
 
@@ -551,7 +577,7 @@ def push_to_github(silent=False):
     folder = folder_var.get().strip()
     branch = branch_var.get().strip() or "main"
 
-    if not validate_environment(folder): return
+    if not validate_environment(folder): return False
     if not silent: set_processing(True, status_txt="PUSHING")
     timer_start = start_timer()
 
@@ -574,7 +600,7 @@ def push_to_github(silent=False):
                 if not silent:
                     messagebox.showerror("Git Error",
                                          f"Could not create branch '{branch}':\n{create_res.stderr}")
-                return
+                return False
             if not silent:
                 set_status(f"CREATED BRANCH: {branch}")
 
@@ -592,7 +618,7 @@ def push_to_github(silent=False):
                 if not silent:
                     messagebox.showerror("Git Error",
                                          f"Could not switch to branch '{branch}':\n{checkout_res.stderr}")
-                return
+                return False
             else:
                 if not silent:
                     set_status(f"SWITCHED TO BRANCH: {branch}")
@@ -611,7 +637,7 @@ def push_to_github(silent=False):
                 messagebox.showerror("Push Blocked",
                                      f"Uncommitted changes detected! Please commit them first.\n\n"
                                      f"Process finished in {elapsed}.")
-            return
+            return False
 
         # 4.1) Check if remote branch exists
         remote_branch_check = subprocess.run(
@@ -631,7 +657,7 @@ def push_to_github(silent=False):
                     set_status("NO CHANGES DETECTED")
                     messagebox.showinfo("Push Status",
                                         "No commits to push.")
-                return
+                return False
         else:
             if not silent: set_status(f"NEW REMOTE BRANCH: {branch}")
 
@@ -650,6 +676,7 @@ def push_to_github(silent=False):
                 messagebox.showinfo("Success",
                                     f"Commits have been pushed!\n\n"
                                     f"Process finished in {elapsed}.")
+            return True
         else:
             if "rejected" in result.stderr.lower():
                 if not silent:
@@ -657,14 +684,17 @@ def push_to_github(silent=False):
                     messagebox.showerror("Push Failed",
                                          "Remote has new commits!\n\n"
                                          "Click 'PULL' first, then try pushing again.")
+                return False
             else:
                 if not silent:
                     set_status("PUSH FAILED")
                     messagebox.showerror("Push Failed", result.stderr)
+                return False
     except Exception as e:
         if not silent:
             elapsed = end_timer(timer_start)
             messagebox.showerror("Error", str(e))
+        return False
     finally:
         if not silent: set_processing(False)
 
@@ -1261,7 +1291,7 @@ def show_help():
 
     ttk.Label(
         footer_frame,
-        text="Build Version: 4.8.stable",
+        text="Build Version: 4.9.stable",
         font=('Arial', 8),
         background=white,
         foreground='gray'
