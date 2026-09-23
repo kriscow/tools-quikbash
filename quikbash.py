@@ -249,7 +249,6 @@ def init_new_repo():
     """Link / Re-Link > Push"""
     folder = folder_var.get().strip()
     url = url_var.get().strip()
-    branch = "main"
 
     if not folder or not url:
         messagebox.showwarning("Input",
@@ -261,6 +260,8 @@ def init_new_repo():
 
     try:
         # 1.1) Check if has valid local
+        # NOTE: 'is_git' is read before 'init'. Do not move.
+        # It decides whether this is a link or a re-link.
         is_git = subprocess.run(
             ['git', '-C', folder, 'rev-parse', '--is-inside-work-tree'],
             capture_output=True, text=True, creationflags=startup_flags
@@ -275,6 +276,44 @@ def init_new_repo():
                 messagebox.showerror("Git Error",
                                      f"Failed to link: {result.stderr}")
                 return
+        # 1.3) Re-link if the connection is broken
+        if is_git.returncode == 0:
+            remote_check = subprocess.run(
+                ['git', '-C', folder, 'remote', 'get-url', 'origin'],
+                capture_output=True, text=True, creationflags=startup_flags
+            )
+            if remote_check.returncode != 0:
+                result = subprocess.run(
+                    ['git', '-C', folder, 'remote', 'add', 'origin', url],
+                    capture_output=True, text=True, creationflags=startup_flags
+                )
+            else:
+                result = subprocess.run(
+                    ['git', '-C', folder, 'remote', 'set-url', 'origin', url],
+                    capture_output=True, text=True, creationflags=startup_flags
+                )
+            if result.returncode != 0:
+                messagebox.showerror("Git Error",
+                                     f"Failed to update remote: {result.stderr}")
+                return
+            # 1.4) Check remote reachability
+            probe = subprocess.run(
+                ['git', '-C', folder, 'ls-remote', '--exit-code', 'origin'],
+                capture_output=True, text=True, creationflags=startup_flags
+            )
+            elapsed = end_timer(timer_start)
+            if probe.returncode in (0, 2):
+                set_status("RE-LINK SUCCESS")
+                messagebox.showinfo("Re-Link Success",
+                                    f"Remote URL updated & reachable.\n\n"
+                                    f"Process finished in {elapsed}.")
+            else:
+                set_status("RE-LINK WARNING")
+                messagebox.showwarning("Re-Link Warning",
+                                     f"Remote URL saved, but unreachable.\n\n"
+                                     f"Expected if the repository does not exist yet.\n\n"
+                                     f"Process finished in {elapsed}.")
+            return
 
         # 2) Add all files
         result = subprocess.run(
@@ -302,6 +341,17 @@ def init_new_repo():
                 return
         else:
             set_status("NO CHANGES DETECTED")
+
+        # 3.3) No commits exist yet (empty or ignored)
+        head_check = subprocess.run(
+            ['git', '-C', folder, 'rev-parse', 'HEAD'],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+        if head_check.returncode != 0:
+            messagebox.showwarning("Nothing to Link",
+                                   "This folder has no files to commit.\n\n"
+                                   "Add some files, then try again.")
+            return
 
         # 4) Set branch to main (default)
         result = subprocess.run(
@@ -1292,7 +1342,7 @@ def show_help():
 
     ttk.Label(
         footer_frame,
-        text="Build Version: 4.9.stable",
+        text="Build Version: 5.0.stable",
         font=('Arial', 8),
         background=white,
         foreground='gray'
@@ -1481,18 +1531,3 @@ if not is_git_available():
 
 validate_fields()
 root.mainloop()
-
-# TODO
-#  make workflow mouse-less (if possible)
-#  add when to use re-link in help
-#  fix initial commit message for re-link
-#  worktree
-
-# what is new
-# open folder
-# branch is now seen in commit viewer
-
-# fixes
-# better quikhelp
-# better button state management
-# drive root bypass on folder entry

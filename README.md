@@ -1,5 +1,9 @@
 # QUIKBASH
-### Built by a developer, for simple developers.
+### A featherweight Git GUI for light projects.
+
+<p align="center">
+    <img src="QB.png" alt="QuikBash Icon" width="200">
+</p>
 
 > Git workflows should not require opening a heavy, resource-intensive desktop application.
 QuikBash is built to be fast and lightweight, focusing solely on the core commands needed for simple projects.
@@ -13,9 +17,10 @@ It is perfect for users who just want to get their repositories updated without 
 | **Developer**    | KRISCOW      | INDIE    |
 | **Engine**       | Python       | 3.14.4   |
 | **Format**       | Desktop Tool | EXE      |
-| **Release**      | v4.3.stable  | RELEASED |
-| **Repository**   | v4.9.stable  | ONGOING  |
-| **Public Since** | July 7, 2026 | -        |
+| **Version**      | v5.0.stable  | FROZEN   |
+| **Since**        | July 7, 2026 |          |
+
+#### QuikBash is now feature-complete and frozen. Further developments will be up to you, rockstar.
 
 ---
 
@@ -51,3 +56,7 @@ py -m pip install pyinstaller
 ```
 py -m PyInstaller --noconfirm QuikBash.spec
 ```
+
+---
+
+**MIT License** / See [LICENSE](LICENSE) for details.
