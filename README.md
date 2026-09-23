@@ -1,5 +1,5 @@
 # QUIKBASH
-### A featherweight Git GUI for light projects.
+### A featherweight Git GUI to work without the bloat.
 
 <p align="center">
     <img src="QB.png" alt="QuikBash Icon" width="200">

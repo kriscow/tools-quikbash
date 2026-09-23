@@ -1267,7 +1267,7 @@ def show_help():
     """Guide on entries and buttons"""
     win = tk.Toplevel(root)
     win.title("QuikHelp")
-    win.geometry("500x475")
+    win.geometry("500x491")
     win.configure(background=white)
 
     # Entries Help
