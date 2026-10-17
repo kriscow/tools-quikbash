@@ -60,6 +60,12 @@ def validate_fields(*args):
         init_button.config(state="disabled")
     update_init_button_label()
 
+    # For checkout
+    if folder_var.get().strip() and branch_var.get().strip():
+        check_button.config(state="normal")
+    else:
+        check_button.config(state="disabled")
+
     # For git commands
     can_operate = bool(folder_var.get().strip() and msg_var.get().strip())
     for btn in [anc_button, push_button, sync_button]:
@@ -145,6 +151,7 @@ def validate_fields_ex(folder):
         branch_entry['values'] = all_branches
         merge_from_entry['values'] = all_branches
         merge_to_entry['values'] = all_branches
+    update_branch_sts()
 
 def validate_environment(folder_name, check_git=True):
     """Folder exists && Git repo"""
@@ -198,6 +205,23 @@ def run_async(func):
 def update_sts(func, **kwargs):
     root.after(0, lambda: func(**kwargs))
 
+def update_branch_sts():
+    folder = folder_var.get().strip()
+    if not folder or not os.path.isdir(folder):
+        update_sts(status_var.set, value="READY")
+        return
+
+    result = subprocess.run(
+        ['git', '-C', folder, 'rev-parse', '--abbrev-ref', 'HEAD'],
+        capture_output=True, text=True, creationflags=startup_flags
+    )
+
+    if result.returncode == 0:
+        branch = result.stdout.strip()
+        update_sts(status_var.set, value=f"CURRENT BRANCH: {branch}")
+    else:
+        update_sts(status_var.set, value="READY")
+
 def update_btns(state):
     buttons = [
         init_button,
@@ -225,7 +249,7 @@ def set_processing(active, status_txt="PROCESSING"):
         anim_status(status_txt)
     else:
         update_btns("normal")
-        set_status("READY")
+        update_branch_sts()
         validate_fields()
 
 def anim_status(base, dot_count=0):
@@ -458,7 +482,7 @@ def do_all():
         has_unpushed = bool(check_push.stdout.strip())
 
         if has_unpushed:
-            success = push_to_github(silent=True)
+            success = push_to_github(silent=False)
             elapsed = end_timer(timer_start)
             if success:
                 set_status("UNPUSHED COMMITS. PUSHED.")
@@ -823,6 +847,52 @@ def pull_from_github():
         elapsed = end_timer(timer_start)
         messagebox.showerror("Error", str(e))
     finally:
+        set_processing(False)
+
+
+def checkout_branch():
+    """Switch to the selected branch"""
+    folder = folder_var.get().strip()
+    branch = branch_var.get().strip()
+
+    if not folder or not branch:
+        messagebox.showwarning("Input", "Please select a branch to switch to.")
+        return
+    if not validate_environment(folder):
+        return
+
+    # 1) Check for uncommitted changes
+    status = subprocess.run(
+        ['git', '-C', folder, 'status', '--porcelain'],
+        capture_output=True, text=True, creationflags=startup_flags
+    )
+    if status.stdout.strip():
+        confirm = messagebox.askyesno(
+            "Uncommitted Changes",
+            "You have uncommitted changes.\n"
+            "Switching branches may fail or carry changes over.\n\n"
+            "Continue anyway?"
+        )
+        if not confirm:
+            return
+
+    set_processing(True, status_txt=f"SWITCHING TO {branch}")
+
+    try:
+        result = subprocess.run(
+            ['git', '-C', folder, 'checkout', branch],
+            capture_output=True, text=True, creationflags=startup_flags
+        )
+        if result.returncode == 0:
+            messagebox.showinfo("Success", f"Switched to branch '{branch}'.")
+            validate_fields()
+            set_processing(False)
+        else:
+            messagebox.showerror("Checkout Failed", result.stderr)
+            set_processing(False)
+
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
         set_processing(False)
 
 # BRANCH COMMANDS ######################################################################################################
@@ -1267,7 +1337,7 @@ def show_help():
     """Guide on entries and buttons"""
     win = tk.Toplevel(root)
     win.title("QuikHelp")
-    win.geometry("500x491")
+    win.geometry("500x511")
     win.configure(background=white)
 
     # Entries Help
@@ -1322,6 +1392,7 @@ def show_help():
         ("↳", "RE-LINK", "...or reconnect a previously linked repo"),
         ("SETUP", "VIEW COMMITS", "View most recent 20 commits"),
         ("SETUP", "VIEW IGNORE", "View .gitignore contents"),
+        ("WORK", "CHECKOUT", "Switch to selected branch to work on"),
         ("WORK", "COMMIT", "Save changes locally"),
         ("WORK", "UNDO COMMIT", "Revert to previous commit, keep changes"),
         ("WORK", "PUSH", "Upload commits to remote"),
@@ -1342,7 +1413,7 @@ def show_help():
 
     ttk.Label(
         footer_frame,
-        text="Build Version: 5.0.stable",
+        text="Build Version: 5.1.stable",
         font=('Arial', 8),
         background=white,
         foreground='gray'
@@ -1353,7 +1424,7 @@ def show_help():
 # Base
 root = tk.Tk()
 root.title("QuikBash")
-root.geometry("425x530")
+root.geometry("425x575")
 root.configure(background=white)
 
 # Style
@@ -1450,6 +1521,9 @@ branch_entry = ttk.Combobox(tab2, width=50, textvariable=branch_var)
 branch_entry.pack(pady=5, fill=tk.X)
 branch_entry['values'] = []
 branch_var.set("main")
+
+check_button = ttk.Button(tab2, text="CHECKOUT", command=lambda: run_async(checkout_branch), state="disabled")
+check_button.pack(fill=tk.X, pady=5)
 
 ttk.Label(tab2, text="Message:").pack(pady=(10, 0))
 commit_entry = ttk.Entry(tab2, textvariable=msg_var)
