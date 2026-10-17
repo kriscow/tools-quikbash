@@ -17,7 +17,7 @@ It is perfect for users who just want to get their repositories updated without 
 | **Developer**    | KRISCOW      | INDIE         |
 | **Engine**       | Python       | 3.14.4        |
 | **Format**       | Desktop Tool | EXE           |
-| **Version**      | v5.0.stable  | FROZEN        |
+| **Version**      | v5.1.stable  | FROZEN        |
 | **Timeline**     | Jul 7, 2026  | Oct 17, 2026  |
 
 #### QuikBash is now feature-complete and frozen. Further developments will be up to you, rockstar.
